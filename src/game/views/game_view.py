@@ -16,7 +16,7 @@ class GameView(arcade.View):
         self.controls = self.controls_storage.load()
         self.pressed_keys: set[int] = set()
 
-        # игрок (пример)
+        # игрок
         self.player = arcade.SpriteSolidColor(40, 40, arcade.color.YELLOW)
         self.player.center_x = 200
         self.player.center_y = 200
@@ -25,25 +25,29 @@ class GameView(arcade.View):
 
         self.speed = 260
 
+        # 🔹 ТЕКСТ (создаём один раз)
+        self.hint_text = arcade.Text(
+            "Стрелки — движение | Esc — выход",
+            10, 10,  # x, y
+            arcade.color.WHITE,  # color
+            14  # font_size
+        )
+
     def on_show_view(self):
         arcade.set_background_color(arcade.color.DARK_BLUE_GRAY)
-        # если управление меняли в меню — можно перечитать
         self.controls = self.controls_storage.load()
 
     def on_draw(self):
         self.clear()
         self.player_list.draw()
 
-        arcade.draw_text(
-            "WASD/стрелки (если настроите) | Esc - выход",
-            10, 10, arcade.color.WHITE, 14
-        )
+        # 🔹 вместо arcade.draw_text
+        self.hint_text.draw()
 
     def on_key_press(self, symbol: int, modifiers: int):
         self.pressed_keys.add(symbol)
 
         if symbol in self.controls.bindings.get("pause", []):
-            # Пока просто закрываем игру
             arcade.close_window()
 
     def on_key_release(self, symbol: int, modifiers: int):
