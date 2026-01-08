@@ -1,0 +1,23 @@
+{
+  "move_up": [
+    "MOTION_UP"
+  ],
+  "move_down": [
+    "DOWN"
+  ],
+  "move_left": [
+    "LEFT"
+  ],
+  "move_right": [
+    "MOTION_RIGHT"
+  ],
+  "shoot": [
+    "MOD_WINDOWS"
+  ],
+  "dash": [
+    "LSHIFT"
+  ],
+  "pause": [
+    "ESCAPE"
+  ]
+}
