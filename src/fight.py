@@ -1,23 +1,27 @@
 import arcade
 import random
 from itertools import cycle
+import math
 
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_WIDTH = 1400
+SCREEN_HEIGHT = 800
 SCREEN_TITLE = "Овощебанда"
 SPEED = 5
 WATER_HEIGHT = SCREEN_HEIGHT // 3
-BULLET_SPEED = 60
+BULLET_SPEED = 40
 
 
 class Bullet(arcade.Sprite):
-    def __init__(self, x, y, direction_x, shoot):
-        super().__init__(shoot, scale=0.5)
+    def __init__(self, x, y, direction_x, direction_y, shoot, angle=0):
+        super().__init__(shoot, scale=0.7)
         self.center_x = x
         self.center_y = y
         self.change_x = direction_x * BULLET_SPEED
-        self.change_y = 0
-        self.lifetime = 60
+        self.change_y = direction_y * BULLET_SPEED
+        self.lifetime = 120
+        self.angle = angle  # Угол поворота для диагональных выстрелов
+        if angle != 0:
+            self.angle = angle  # Устанавливаем угол поворота спрайта
 
     def update(self, delta_time):
         self.center_x += self.change_x
@@ -45,6 +49,13 @@ class CupHead(arcade.Sprite):
             "shoot_down": {"right": [], "left": []},
             "shoot_diagonal_down": {"right": [], "left": []},
             "shoot_diagonal_up": {"right": [], "left": []},
+            "shoot_straight_running": {"right": [], "left": []},
+            "shoot_diagonal_up_running": {"right": [], "left": []},
+            "shoot_diagonal_up_running_left": {
+                "right": [],
+                "left": [],
+            },
+            'duck_shoot': {"right": [], "left": []},
         }
 
         for i in range(1, 6):
@@ -122,7 +133,7 @@ class CupHead(arcade.Sprite):
             self.textures_dict["flex"]["right"].append(texture)
 
         for i in range(1, 4):
-            path = f"images/Aim/Straight/cuphead_aim_straight_000{i}.png"
+            path = f"images/Shoot/Straight/cuphead_shoot_straight_000{i}.png"
             texture = arcade.load_texture(path)
             self.textures_dict["shoot_straight"]["right"].append(texture)
 
@@ -130,8 +141,8 @@ class CupHead(arcade.Sprite):
             flipped_texture = texture.flip_left_right()
             self.textures_dict["shoot_straight"]["left"].append(flipped_texture)
 
-        for i in range(1, 6):
-            path = f"images/Aim/Up/cuphead_aim_up_000{i}.png"
+        for i in range(1, 4):
+            path = f"images/Shoot/Up/cuphead_shoot_up_000{i}.png"
             texture = arcade.load_texture(path)
             self.textures_dict["shoot_up"]["right"].append(texture)
 
@@ -139,8 +150,8 @@ class CupHead(arcade.Sprite):
             flipped_texture = texture.flip_left_right()
             self.textures_dict["shoot_up"]["left"].append(flipped_texture)
 
-        for i in range(1, 6):
-            path = f"images/Aim/Down/cuphead_aim_down_000{i}.png"
+        for i in range(1, 4):
+            path = f"images/Shoot/Down/cuphead_shoot_down_000{i}.png"
             texture = arcade.load_texture(path)
             self.textures_dict["shoot_down"]["right"].append(texture)
 
@@ -148,8 +159,8 @@ class CupHead(arcade.Sprite):
             flipped_texture = texture.flip_left_right()
             self.textures_dict["shoot_down"]["left"].append(flipped_texture)
 
-        for i in range(1, 6):
-            path = f"images/Aim/Diagonal Up/cuphead_aim_diagonal_up_000{i}.png"
+        for i in range(1, 4):
+            path = f"images/Shoot/Diagonal Up/cuphead_shoot_diagonal_up_000{i}.png"
             texture = arcade.load_texture(path)
             self.textures_dict["shoot_diagonal_up"]["right"].append(texture)
 
@@ -157,14 +168,45 @@ class CupHead(arcade.Sprite):
             flipped_texture = texture.flip_left_right()
             self.textures_dict["shoot_diagonal_up"]["left"].append(flipped_texture)
 
-        for i in range(1, 6):
-            path = f"images/Aim/Diagonal Down/cuphead_aim_diagonal_down_000{i}.png"
+        for i in range(1, 17):
+            path = f"images/Run/Shooting/Straight/cuphead_run_shoot_{'0' * (4 - len(str(i)))}{i}.png"
             texture = arcade.load_texture(path)
-            self.textures_dict["shoot_diagonal_down"]["right"].append(texture)
+            self.textures_dict["shoot_straight_running"]["right"].append(texture)
 
-        for texture in self.textures_dict["shoot_diagonal_down"]["right"]:
+        for texture in self.textures_dict["shoot_straight_running"]["right"]:
             flipped_texture = texture.flip_left_right()
-            self.textures_dict["shoot_diagonal_down"]["left"].append(flipped_texture)
+            self.textures_dict["shoot_straight_running"]["left"].append(flipped_texture)
+
+        for i in range(1, 17):
+            path = f"images/Run/Shooting/Diagonal Up/cuphead_run_shoot_diagonal_up_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            self.textures_dict["shoot_diagonal_up_running"]["right"].append(texture)
+
+        for texture in self.textures_dict["shoot_diagonal_up_running"]["right"]:
+            flipped_texture = texture.flip_left_right()
+            self.textures_dict["shoot_diagonal_up_running"]["left"].append(
+                flipped_texture
+            )
+
+        for i in range(1, 17):
+            path = f"images/Run/Shooting/Diagonal Up/cuphead_run_shoot_diagonal_up_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            self.textures_dict["shoot_diagonal_up_running_left"]["left"].append(texture)
+
+        for texture in self.textures_dict["shoot_diagonal_up_running_left"]["left"]:
+            flipped_texture = texture.flip_left_right()
+            self.textures_dict["shoot_diagonal_up_running_left"]["right"].append(
+                flipped_texture
+            )
+
+        for i in range(1, 4):
+            path = f"images/Duck/Shoot/cuphead_duck_shoot_000{i}.png"
+            texture = arcade.load_texture(path)
+            self.textures_dict["duck_shoot"]["right"].append(texture)
+
+        for texture in self.textures_dict["duck_shoot"]["right"]:
+            flipped_texture = texture.flip_left_right()
+            self.textures_dict["duck_shoot"]["left"].append(flipped_texture)
 
         self.state = "idle"
         self.direction = "right"
@@ -190,12 +232,7 @@ class CupHead(arcade.Sprite):
         self.key = False
         self.count_dash = 1
 
-        self.keys_pressed = {"left": False, "right": False}
-
-        # Переменные для управления хитбоксом
-        self.normal_height = None
-        self.normal_center_y = None
-        self.duck_height_offset = 30  # На сколько уменьшаем высоту при приседе
+        self.keys_pressed = {"left": False, "right": False, "up": False, "down": False}
 
         # стрельба
         self.shooting_straight = False
@@ -205,8 +242,15 @@ class CupHead(arcade.Sprite):
         self.shooting_diagonal_up = False
 
         self.shooting = False
-        self.shoot_cooldown = 0  # Задержка между выстрелами
-        self.shoot_timer = 0  # Таймер для анимации
+        self.shoot_cooldown = 0
+        self.shoot_timer = 0
+
+        self.shoot_diagonal_up_running = False
+        self.shoot_straight_running = False
+        self.shoot_diagonal_up_running_left = (
+            False
+        )
+        self.duck_shooting = False
 
         self.animation_speeds = {
             "idle": 8,
@@ -217,12 +261,15 @@ class CupHead(arcade.Sprite):
             "dash": 4,
             "flex": 8,
             "dash_back": 2,
-            "duck_shoot": 2,
+            "duck_shoot": 8,
             "shoot_down": 2,
-            "shoot_up": 2,
+            "shoot_up": 8,
             "shoot_straight": 8,
             "shoot_diagonal_down": 1,
             "shoot_diagonal_up": 1,
+            "shoot_straight_running": 8,
+            "shoot_diagonal_up_running": 8,
+            "shoot_diagonal_up_running_left": 8,
         }
 
     def update(self, delta_time):
@@ -239,10 +286,59 @@ class CupHead(arcade.Sprite):
             new_state = "dash_back"
 
         elif not self.on_ground and not self.dashing:
+            # В прыжке оставляем обычную анимацию прыжка
             new_state = "jump"
 
         elif self.dashing:
             new_state = "dash"
+
+        # Проверяем стрельбу в приседе
+        elif self.shooting and self.duck:
+            new_state = "duck_shoot"
+            self.duck_shooting = True
+
+        # Проверяем стрельбу во время бега
+        elif self.shooting and self.moving:
+            if self.keys_pressed["up"]:
+                if self.direction == "right":
+                    new_state = "shoot_diagonal_up_running"
+                    self.shoot_diagonal_up_running = True
+                else:
+                    new_state = "shoot_diagonal_up_running_left"
+                    self.shoot_diagonal_up_running_left = True
+                self.shoot_straight_running = False
+                self.shooting_straight = False
+            else:
+                new_state = "shoot_straight_running"
+                self.shoot_straight_running = True
+                self.shoot_diagonal_up_running = False
+                self.shoot_diagonal_up_running_left = False
+                self.shooting_straight = False
+
+        elif self.shoot_straight_running:
+            new_state = "shoot_straight_running"
+
+        elif self.shoot_diagonal_up_running:
+            new_state = "shoot_diagonal_up_running"
+
+        elif self.shoot_diagonal_up_running_left:
+            new_state = "shoot_diagonal_up_running_left"
+
+        # Проверяем стрельбу стоя на месте
+        elif self.shooting and not self.moving and not self.duck and self.on_ground:
+            if self.keys_pressed["up"]:
+                new_state = "shoot_up"
+                self.shooting_up = True
+                self.shooting_straight = False
+            elif self.keys_pressed["down"]:
+                new_state = "shoot_down"
+                self.shooting_down = True
+                self.shooting_straight = False
+            else:
+                new_state = "shoot_straight"
+                self.shooting_straight = True
+                self.shooting_up = False
+                self.shooting_down = False
 
         elif self.shooting_straight:
             new_state = "shoot_straight"
@@ -286,7 +382,7 @@ class CupHead(arcade.Sprite):
                 self.current_frame = 0
                 self.duck_idle = False
 
-        elif not self.duck and (self.state in ["duck", "duck_idle"]):
+        elif not self.duck and (self.state in ["duck", "duck_idle", "duck_shoot"]):
             if self.state == "duck_idle":
                 new_state = "duck"
                 self.duck_direction = -1
@@ -306,6 +402,11 @@ class CupHead(arcade.Sprite):
                 if self.current_frame <= 0:
                     new_state = "idle"
                     self.current_frame = 0
+            elif self.state == "duck_shoot":
+                new_state = "duck"
+                self.duck_direction = -1
+                self.current_frame = len(self.textures_dict["duck"][self.direction]) - 1
+                self.duck_idle = False
 
         elif self.moving and self.change_x != 0 and not self.duck:
             new_state = "run"
@@ -339,11 +440,54 @@ class CupHead(arcade.Sprite):
                     self.can_move = True
                     self.current_frame = len(textures_list) - 1
                     self.flexing = False
+                    # ВОССТАНАВЛИВАЕМ ГРАВИТАЦИЮ ПОСЛЕ FLEX
+                    self.change_y = 0  # Сбрасываем вертикальную скорость
                 return
+
         if self.state == "shoot_straight":
             textures_list = self.textures_dict["shoot_straight"][self.direction]
             if textures_list:
                 self.current_frame = (self.current_frame + 1) % len(textures_list)
+
+        if self.state == "shoot_up":
+            textures_list = self.textures_dict["shoot_up"][self.direction]
+            if textures_list:
+                self.current_frame = (self.current_frame + 1) % len(textures_list)
+
+        if self.state == "shoot_down":
+            textures_list = self.textures_dict["shoot_down"][self.direction]
+            if textures_list:
+                self.current_frame = (self.current_frame + 1) % len(textures_list)
+
+        if self.state == "shoot_diagonal_up":
+            textures_list = self.textures_dict["shoot_diagonal_up"][self.direction]
+            if textures_list:
+                self.current_frame = (self.current_frame + 1) % len(textures_list)
+
+        if self.state == "duck_shoot":
+            textures_list = self.textures_dict["duck_shoot"][self.direction]
+            if textures_list:
+                self.current_frame = (self.current_frame + 1) % len(textures_list)
+
+        if self.state == "shoot_straight_running":
+            textures_list = self.textures_dict["shoot_straight_running"][self.direction]
+            if textures_list:
+                self.current_frame = (self.current_frame + 1) % len(textures_list)
+
+        if self.state == "shoot_diagonal_up_running":
+            textures_list = self.textures_dict["shoot_diagonal_up_running"][
+                self.direction
+            ]
+            if textures_list:
+                self.current_frame = (self.current_frame + 1) % len(textures_list)
+
+        if self.state == "shoot_diagonal_up_running_left":
+            textures_list = self.textures_dict["shoot_diagonal_up_running_left"][
+                self.direction
+            ]
+            if textures_list:
+                self.current_frame = (self.current_frame + 1) % len(textures_list)
+
         if self.state == "idle":
             self.count_dash = 1
             self.current_frame += self.idle_direction
@@ -371,16 +515,6 @@ class CupHead(arcade.Sprite):
             if textures_list:
                 self.current_frame += self.duck_direction
 
-                # ВОССТАНАВЛИВАЕМ ХИТБОКС ПРИ ВСТАВАНИИ
-                if self.duck_direction == -1 and self.normal_height is not None:
-                    # Плавно возвращаем нормальную высоту
-                    if self.height < self.normal_height:
-                        height_diff = self.normal_height - self.height
-                        step = min(3, height_diff)
-                        self.height += step
-                        # Поднимаем персонажа чтобы остаться на земле
-                        self.center_y += step / 2
-
                 if self.current_frame < 0:
                     self.current_frame = 0
                 elif self.current_frame >= len(textures_list):
@@ -390,20 +524,6 @@ class CupHead(arcade.Sprite):
             textures_list = self.textures_dict["duck_idle"][self.direction]
             if textures_list:
                 self.current_frame += self.idle_direction
-
-                # ЗАПОМИНАЕМ НОРМАЛЬНЫЕ РАЗМЕРЫ ПРИ ПЕРВОМ ВХОЖДЕНИИ
-                if self.normal_height is None:
-                    self.normal_height = self.height
-                    self.normal_center_y = self.center_y
-
-                # УМЕНЬШАЕМ ХИТБОКС ДЛЯ ПРИСЕДА
-                target_height = self.normal_height - self.duck_height_offset
-                if self.height > target_height:
-                    height_diff = self.height - target_height
-                    step = min(3, height_diff)
-                    self.height -= step
-                    # Опускаем персонажа чтобы остаться на земле
-                    self.center_y -= step / 2
 
                 if self.current_frame >= len(textures_list) - 1:
                     self.current_frame = len(textures_list) - 1
@@ -494,9 +614,10 @@ class GameWindow(arcade.Window):
         self.floes = arcade.SpriteList()
         self.cuphead = CupHead("images/Idle/cuphead_idle_0001.png", 0.8, 2)
         self.cuphead.center_x = 50
-        self.cuphead.center_y = 100  # Начальная высота 100 (50 + нормальная высота)
+        self.cuphead.center_y = 100
         self.cuphead.change_x = 0
         self.cuphead.change_y = 0
+        self.pull = cycle((15, 0, -15))
 
         self.victory = False
         self.loose = False
@@ -527,6 +648,7 @@ class GameWindow(arcade.Window):
                 not self.cuphead.dashing
                 and self.cuphead.can_move
                 and not self.cuphead.dashing_back
+                and not self.cuphead.flexing  # Не применяем гравитацию во время flex
         ):
             self.cuphead.change_y -= 0.5
 
@@ -547,46 +669,113 @@ class GameWindow(arcade.Window):
                 self.cuphead.dashing_back = False
                 self.cuphead.change_x = 0
 
-        # Проверка земли (50 пикселей от низа экрана)
+        # Проверка земли
         ground_level = 50
         if self.cuphead.bottom <= ground_level:
             self.cuphead.bottom = ground_level
             self.cuphead.on_ground = True
             self.cuphead.change_y = 0
-            self.cuphead.count_dash = 1  # Восстанавливаем дэши при приземлении
+            self.cuphead.count_dash = 1
         else:
             self.cuphead.on_ground = False
 
         if self.cuphead.shooting and self.cuphead.shoot_cooldown <= 0:
-            # Создать пулю
+            # Определяем направление стрельбы
+            direction_x = 0
+            direction_y = 0
+            bullet_angle = 0
             flag = self.cuphead.direction == "right"
-            shoot = arcade.load_texture("images/shoot/peashooter.png")
-            if not flag:
+            pull_move = self.cuphead.center_x + 50 * (-1, 1)[flag]
+            pull_up = self.cuphead.center_y + next(self.pull)
+
+            # Определяем тип стрельбы и корректируем параметры
+            if self.cuphead.duck_shooting:
+                # Стрельба в приседе
+                direction_x = 1 if self.cuphead.direction == "right" else -1
+                direction_y = 0
+                bullet_angle = 0
+                pull_move += 50 * (-1, 1)[flag]
+            elif not self.cuphead.on_ground and self.cuphead.keys_pressed["up"]:
+                # Стрельба вверх в прыжке (диагональная)
+                direction_x = 1 if self.cuphead.direction == "right" else -1
+                direction_y = 0.707  # 45 градусов
+                pull_up += 50
+                bullet_angle = 45 if self.cuphead.direction == "right" else -45
+            elif (
+                    self.cuphead.shoot_diagonal_up_running
+                    or self.cuphead.shoot_diagonal_up_running_left
+            ):
+                # Диагональный выстрел при беге
+                direction_x = 1 if self.cuphead.direction == "right" else -1
+                direction_y = 0.707
+                pull_up += 50
+                # Угол для пули: 45 градусов вверх
+                bullet_angle = 45 if self.cuphead.direction == "right" else -45
+            elif self.cuphead.shooting_up and self.cuphead.on_ground:
+                # Стрельба вверх стоя на земле
+                direction_x = 0
+                direction_y = 1
+                pull_move -= 30 * (-1, 1)[flag]
+                pull_up += 100
+                bullet_angle = 90  # Поворот на 90 градусов для стрельбы вверх
+            elif self.cuphead.shooting_down:
+                # Стрельба вниз стоя
+                direction_x = 0
+                direction_y = -1
+                pull_up -= 50
+                bullet_angle = -90  # Поворот на -90 градусов для стрельбы вниз
+            elif self.cuphead.shooting_straight:
+                # Стрельба прямо стоя
+                direction_x = 1 if self.cuphead.direction == "right" else -1
+                direction_y = 0
+                bullet_angle = 0
+            elif self.cuphead.shoot_straight_running:
+                # Стрельба прямо при беге
+                direction_x = 1 if self.cuphead.direction == "right" else -1
+                direction_y = 0
+                bullet_angle = 0
+            elif not self.cuphead.on_ground:
+                # Стрельба в прыжке (обычная, горизонтальная)
+                direction_x = 1 if self.cuphead.direction == "right" else -1
+                direction_y = 0
+                bullet_angle = 0
+
+            # Создать пулю
+            shoot = arcade.load_texture("images/shoots/peashooter.png")
+
+            # Поворачиваем текстуру в зависимости от угла
+            if bullet_angle == 90:  # Вверх
+                shoot = shoot.rotate_180()
+            elif bullet_angle == -90:  # Вниз
+                shoot = shoot
+            elif bullet_angle == 45:  # Диагональ вправо-вверх
+                shoot = shoot.rotate_90(3)
+            elif bullet_angle == -45:  # Диагональ влево-вверх
+                shoot = shoot.rotate_90(3)
+
+            # Для стрельбы влево - зеркалим
+            if not flag and bullet_angle == 0:
                 shoot = shoot.flip_left_right()
+
             bullet = Bullet(
-                self.cuphead.center_x,
-                self.cuphead.center_y,
-                (-1, 1)[flag],
-                shoot
+                pull_move, pull_up, direction_x, direction_y, shoot, bullet_angle
             )
             self.all_sprites.append(bullet)
 
-            # Установить кулдаун
-            self.cuphead.shoot_cooldown = 10  # Например, 10 кадров между выстрелами
+            # кулдаун
+            self.cuphead.shoot_cooldown = 6
 
-        # Уменьшать кулдаун каждый кадр
         if self.cuphead.shoot_cooldown > 0:
             self.cuphead.shoot_cooldown -= 1
 
-        if not self.cuphead.shooting:
-            self.shooting_straight = False
-            self.shooting_up = False
-            self.shooting_down = False
-            self.shooting_diagonal_up = False
-            self.shooting_diagonal_down = False
+        # Сбрасываем состояния стрельбы при беге, если не стреляем или не двигаемся
+        if not self.cuphead.shooting or not self.cuphead.moving:
+            self.cuphead.shoot_straight_running = False
+            self.cuphead.shoot_diagonal_up_running = False
+            self.cuphead.shoot_diagonal_up_running_left = False
 
     def on_key_press(self, key, modifiers):
-        if self.loose or self.victory:
+        if self.loose or self.victory or self.cuphead.flexing:
             return
 
         if key == arcade.key.LEFT:
@@ -597,6 +786,7 @@ class GameWindow(arcade.Window):
                     not self.cuphead.dashing
                     and not self.cuphead.dashing_back
                     and not self.cuphead.duck
+                    and not self.cuphead.flexing
             ):
                 self.cuphead.change_x = -SPEED
                 self.cuphead.moving = True
@@ -612,6 +802,7 @@ class GameWindow(arcade.Window):
                     not self.cuphead.dashing
                     and not self.cuphead.dashing_back
                     and not self.cuphead.duck
+                    and not self.cuphead.flexing
             ):
                 self.cuphead.change_x = SPEED
                 self.cuphead.moving = True
@@ -619,20 +810,37 @@ class GameWindow(arcade.Window):
                 self.cuphead.moving = False
                 self.cuphead.change_x = 0
 
-        elif key == arcade.key.SPACE and self.cuphead.on_ground:
-            self.cuphead.change_y = 10
-            self.cuphead.on_ground = False
+        elif key == arcade.key.UP:
+            self.cuphead.keys_pressed["up"] = True
+            # При нажатии UP меняем состояние стрельбы если уже стреляем и на земле
+            if self.cuphead.shooting and not self.cuphead.moving and not self.cuphead.duck and self.cuphead.on_ground:
+                self.cuphead.shooting_up = True
+                self.cuphead.shooting_straight = False
 
         elif key == arcade.key.DOWN:
+            self.cuphead.keys_pressed["down"] = True
             self.cuphead.duck = True
             self.cuphead.change_x = 0
             self.cuphead.moving = False
+            # При приседе сбрасываем состояния стрельбы вверх/вниз
+            if self.cuphead.shooting:
+                self.cuphead.shooting_up = False
+                self.cuphead.shooting_down = False
+
+        elif (
+                key == arcade.key.SPACE
+                and self.cuphead.on_ground
+                and not self.cuphead.flexing
+        ):
+            self.cuphead.change_y = 10
+            self.cuphead.on_ground = False
 
         # ДЭШ
         if (
                 key == arcade.key.X
                 and not self.cuphead.dashing
                 and not self.cuphead.dashing_back
+                and not self.cuphead.flexing
         ):
             if self.cuphead.count_dash:
                 self.cuphead.start_dash()
@@ -643,11 +851,25 @@ class GameWindow(arcade.Window):
         elif key == arcade.key.F and not self.cuphead.flexing:
             self.cuphead.flexing = True
             self.cuphead.change_x = 0
+            self.cuphead.change_y = 0  # Сбрасываем вертикальную скорость
             self.cuphead.moving = False
             self.cuphead.can_move = False
-        if key == arcade.key.Z:
-            self.cuphead.shooting_straight = True
+            # Останавливаем стрельбу при начале flex
+            self.cuphead.shooting = False
+            self.cuphead.shooting_straight = False
+            self.cuphead.shooting_up = False
+            self.cuphead.shooting_down = False
+            self.cuphead.shoot_straight_running = False
+            self.cuphead.shoot_diagonal_up_running = False
+            self.cuphead.shoot_diagonal_up_running_left = False
+            self.cuphead.duck_shooting = False
+            self.cuphead.shooting_diagonal_up = False
+
+        if key == arcade.key.Z and not self.cuphead.flexing:
             self.cuphead.shooting = True
+            # При начале стрельбы устанавливаем состояние по умолчанию
+            if not self.cuphead.moving and not self.cuphead.duck and self.cuphead.on_ground:
+                self.cuphead.shooting_straight = True
 
     def on_key_release(self, key, modifiers):
         if self.loose or self.victory:
@@ -659,13 +881,23 @@ class GameWindow(arcade.Window):
         elif key == arcade.key.RIGHT:
             self.cuphead.keys_pressed["right"] = False
 
-        elif key == arcade.key.DOWN:
-            self.cuphead.duck = False
-            if self.cuphead.normal_height is not None:
-                self.cuphead.height = self.cuphead.normal_height
-                self.cuphead.center_y = self.cuphead.normal_center_y
+        elif key == arcade.key.UP:
+            self.cuphead.keys_pressed["up"] = False
+            # При отпускании UP меняем состояние стрельбы только если на земле
+            if self.cuphead.shooting and not self.cuphead.moving and not self.cuphead.duck and self.cuphead.on_ground:
+                self.cuphead.shooting_up = False
+                self.cuphead.shooting_straight = True
 
-            if not self.cuphead.dashing and not self.cuphead.dashing_back:
+        elif key == arcade.key.DOWN:
+            self.cuphead.keys_pressed["down"] = False
+            self.cuphead.duck = False
+            self.cuphead.duck_shooting = False
+
+            if (
+                    not self.cuphead.dashing
+                    and not self.cuphead.dashing_back
+                    and not self.cuphead.flexing
+            ):
                 any_key_pressed = (
                         self.cuphead.keys_pressed["left"]
                         or self.cuphead.keys_pressed["right"]
@@ -684,6 +916,7 @@ class GameWindow(arcade.Window):
                 not self.cuphead.dashing
                 and not self.cuphead.dashing_back
                 and not self.cuphead.duck
+                and not self.cuphead.flexing
         ):
             if key == arcade.key.LEFT and self.cuphead.change_x < 0:
                 if self.cuphead.keys_pressed["right"]:
@@ -705,9 +938,17 @@ class GameWindow(arcade.Window):
 
         if key == arcade.key.Z:
             self.cuphead.shooting = False
+            self.cuphead.shoot_straight_running = False
+            self.cuphead.shoot_diagonal_up_running = False
+            self.cuphead.shoot_diagonal_up_running_left = False
+            self.cuphead.shooting_straight = False
+            self.cuphead.shooting_up = False
+            self.cuphead.shooting_down = False
+            self.cuphead.duck_shooting = False
+            self.cuphead.shooting_diagonal_up = False
 
 
-def setup_game(width=800, height=600, title="CUPHEAD"):
+def setup_game(width=1500, height=870, title="CUPHEAD"):
     game = GameWindow(width, height, title)
     game.setup()
     return game
