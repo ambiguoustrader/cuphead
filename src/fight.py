@@ -9,7 +9,174 @@ SCREEN_TITLE = "Овощебанда"
 SPEED = 5
 WATER_HEIGHT = SCREEN_HEIGHT // 3
 BULLET_SPEED = 40
-EX_BULLET_SPEED = 80  # Скорость для супер-пуль
+EX_BULLET_SPEED = 30  # Скорость для супер-пуль
+
+
+class Satyr(arcade.Sprite):
+    def __init__(self, x, y, direction_x):
+        # Используем базовую текстуру
+        texture = arcade.load_texture("images/Satyr/Jump/lv3-2_satyr_jump_0001.png")
+        super().__init__(texture)
+
+        self.center_x = x
+        self.center_y = y
+        self.change_x = direction_x * 2  # Скорость движения
+        self.change_y = 0
+        self.hp = 100
+
+        # Направление и состояния
+        self.direction = "right" if direction_x > 0 else "left"
+        self.start = True  # Флаг начальной анимации прыжка
+        self.on_ground = False
+        self.state = "jump"
+        self.current_frame = 0
+        self.animation_speed_counter = 0
+        self.animation_speed = 4  # Скорость анимации
+        self.start_jump_complete = False  # Флаг завершения начального прыжка
+        self.jump_phase = "up"  # Фаза прыжка: "up" или "down"
+        self.jump_frames = 0  # Счетчик кадров прыжка
+
+        # Загрузка текстур
+        self.textures_dict = {
+            "jump": {"right": [], "left": []},
+            "run": {"right": [], "left": []},
+            "turn": {"right": [], "left": []},
+        }
+
+        # Загрузка анимации прыжка
+        for i in range(1, 20):
+            path = f"images/Satyr/Jump/lv3-2_satyr_jump_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            self.textures_dict["jump"]["left"].append(texture)
+
+        for texture in self.textures_dict["jump"]["left"]:
+            flipped_texture = texture.flip_left_right()
+            self.textures_dict["jump"]["right"].append(flipped_texture)
+
+        # Загрузка анимации бега/пропуска
+        for i in range(1, 25):
+            path = f"images/Satyr/Skip/lv3-2_satyr_skip_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            self.textures_dict["run"]["left"].append(texture)
+
+        for texture in self.textures_dict["run"]["left"]:
+            flipped_texture = texture.flip_left_right()
+            self.textures_dict["run"]["right"].append(flipped_texture)
+
+        # Загрузка анимации поворота
+        for i in range(1, 5):
+            path = f"images/Satyr/Turn/lv3-2_satyr_turn_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            self.textures_dict["turn"]["left"].append(texture)
+
+        for texture in self.textures_dict["turn"]["left"]:
+            flipped_texture = texture.flip_left_right()
+            self.textures_dict["turn"]["right"].append(flipped_texture)
+
+        # Устанавливаем начальную текстуру
+        self.update_texture()
+
+    def update(self, delta_time):
+        """Обновление состояния сатира"""
+        super().update()
+
+        # Обновление анимации
+        self.animation_speed_counter += 1
+        if self.animation_speed_counter >= self.animation_speed:
+            self.animation_speed_counter = 0
+            self.update_animation()
+            self.update_texture()
+
+        # Если в начале игры и еще не завершил начальный прыжок
+        if self.start and not self.start_jump_complete:
+            self.jump_frames += 1
+
+            # Кадры 0-9: прыжок
+            if self.jump_frames <= 20:  # Первые 20 обновлений (примерно 5 кадров анимации)
+                # Поднимаемся
+                self.change_y = 8
+            elif self.jump_frames <= 40:  # Следующие 20 обновлений (кадры 5-10)
+                # Падаем
+                self.change_y = -6
+            else:
+                # Завершаем прыжок, включаем обычную гравитацию
+                self.start_jump_complete = True
+                self.change_y = 0
+        else:
+            # После начального прыжка применяем обычную гравитацию
+            if not self.on_ground:
+                self.change_y -= 0.5
+
+        self.center_y += self.change_y
+        self.center_x += self.change_x
+
+        # Проверка земли
+        ground_level = 50
+        if self.bottom <= ground_level:
+            self.bottom = ground_level
+            self.on_ground = True
+            self.change_y = 0
+
+            # После приземления заканчиваем начальную анимацию
+            if self.start and self.start_jump_complete:
+                # Ждем несколько кадров после приземления для завершения анимации
+                if self.current_frame >= 15:  # Когда достигли последних кадров прыжка
+                    self.start = False
+                    self.state = "run"
+                    self.current_frame = 0
+                    self.animation_speed_counter = 0
+        else:
+            self.on_ground = False
+
+        # Проверка границ экрана
+        if self.left < 0:
+            self.left = 0
+            self.change_x *= -1
+            self.direction = "right" if self.change_x > 0 else "left"
+            self.current_frame = 0  # Сброс кадра при изменении направления
+
+        elif self.right > SCREEN_WIDTH:
+            self.right = SCREEN_WIDTH
+            self.change_x *= -1
+            self.direction = "right" if self.change_x > 0 else "left"
+            self.current_frame = 0  # Сброс кадра при изменении направления
+
+    def update_animation(self):
+        """Обновление анимации"""
+        if self.start:
+            # Проигрываем анимацию прыжка
+            textures_list = self.textures_dict["jump"][self.direction]
+            if textures_list:
+                # Плавное проигрывание всей анимации прыжка
+                if not self.start_jump_complete:
+                    # Во время прыжка проигрываем все кадры
+                    if self.current_frame < len(textures_list) - 1:
+                        self.current_frame += 1
+                else:
+                    # После завершения прыжка можем ускорить анимацию приземления
+                    if self.current_frame < len(textures_list) - 1:
+                        self.current_frame += 1
+        else:
+            # После завершения начального прыжка переходим к анимации бега
+            textures_list = self.textures_dict["run"][self.direction]
+            if textures_list:
+                self.current_frame = (self.current_frame + 1) % len(textures_list)
+
+    def update_texture(self):
+        """Обновление текущей текстуры спрайта"""
+        if self.start:
+            textures_list = self.textures_dict["jump"][self.direction]
+        else:
+            textures_list = self.textures_dict["run"][self.direction]
+
+        if textures_list and 0 <= self.current_frame < len(textures_list):
+            self.texture = textures_list[self.current_frame]
+
+    def take_damage(self, damage):
+        """Принять урон"""
+        self.hp -= damage
+        if self.hp <= 0:
+            self.remove_from_sprite_lists()
 
 
 class Bullet(arcade.Sprite):
@@ -58,8 +225,8 @@ class CupHead(arcade.Sprite):
                 "right": [],
                 "left": [],
             },
-            'duck_shoot': {"right": [], "left": []},
-            'ex_straight': {"right": [], "left": []},
+            "duck_shoot": {"right": [], "left": []},
+            "ex_straight": {"right": [], "left": []},
         }
 
         for i in range(1, 6):
@@ -265,9 +432,7 @@ class CupHead(arcade.Sprite):
 
         self.shoot_diagonal_up_running = False
         self.shoot_straight_running = False
-        self.shoot_diagonal_up_running_left = (
-            False
-        )
+        self.shoot_diagonal_up_running_left = False
         self.duck_shooting = False
 
         self.animation_speeds = {
@@ -288,7 +453,7 @@ class CupHead(arcade.Sprite):
             "shoot_straight_running": 8,
             "shoot_diagonal_up_running": 8,
             "shoot_diagonal_up_running_left": 8,
-            'ex_straight': 6,
+            "ex_straight": 6,
         }
 
     def update(self, delta_time):
@@ -440,7 +605,7 @@ class CupHead(arcade.Sprite):
                 if self.current_frame < len(textures_list) - 1:
                     self.current_frame += 1
                     # Создаем пулю на определенных кадрах анимации
-                    if self.current_frame in [4, 8, 12]:
+                    if self.current_frame == 8:
                         self.create_ex_bullet()
                 else:
                     self.can_move = True
@@ -630,7 +795,7 @@ class CupHead(arcade.Sprite):
         # Позиция выстрела
         flag = self.direction == "right"
         pull_move = self.center_x + 60 * (-1, 1)[flag]
-        pull_up = self.center_y + 30
+        pull_up = self.center_y - 20
 
         # Текстура для супер-пули
         shoot = arcade.load_texture("images/Supers/Mega_Blast.png")
@@ -641,7 +806,13 @@ class CupHead(arcade.Sprite):
 
         # Создаем супер-пулю
         bullet = Bullet(
-            pull_move, pull_up, direction_x, direction_y, shoot, bullet_angle, is_ex=True
+            pull_move,
+            pull_up,
+            direction_x,
+            direction_y,
+            shoot,
+            bullet_angle,
+            is_ex=True,
         )
 
         # Добавляем пулю в список для добавления
@@ -655,18 +826,22 @@ class GameWindow(arcade.Window):
 
     def setup(self):
         self.all_sprites = arcade.SpriteList()
-        self.floes = arcade.SpriteList()
+        self.enemies = arcade.SpriteList()
+        self.bullets = arcade.SpriteList()
         self.cuphead = CupHead("images/Idle/cuphead_idle_0001.png", 0.8, 2)
         self.cuphead.center_x = 50
         self.cuphead.center_y = 100
         self.cuphead.change_x = 0
         self.cuphead.change_y = 0
+        self.satyr = Satyr(random.randint(50, 750), 70, -1)
         self.pull = cycle((15, 0, -15))
 
         self.victory = False
         self.loose = False
+        self.hits = 0
 
         self.all_sprites.append(self.cuphead)
+        self.enemies.append(self.satyr)
 
     def on_draw(self):
         arcade.draw_texture_rect(
@@ -677,6 +852,8 @@ class GameWindow(arcade.Window):
         )
 
         self.all_sprites.draw()
+        self.enemies.draw()
+        self.bullets.draw()
         if self.victory:
             self.pp.draw()
 
@@ -685,11 +862,13 @@ class GameWindow(arcade.Window):
             return
 
         self.all_sprites.update(delta_time)
+        self.bullets.update(delta_time)
+        self.enemies.update(delta_time)  # Теперь вызываем без параметра hits
         self.cuphead.update(delta_time)
 
         # Добавляем пули из списка cuphead (супер-атака)
         for bullet in self.cuphead.bullets_to_add:
-            self.all_sprites.append(bullet)
+            self.bullets.append(bullet)
         self.cuphead.bullets_to_add.clear()  # Очищаем список после добавления
 
         # Применяем гравитацию только если не в дэше, не в flex и не в супер-атаке
@@ -810,7 +989,7 @@ class GameWindow(arcade.Window):
             bullet = Bullet(
                 pull_move, pull_up, direction_x, direction_y, shoot, bullet_angle
             )
-            self.all_sprites.append(bullet)
+            self.bullets.append(bullet)
 
             # кулдаун
             self.cuphead.shoot_cooldown = 6
@@ -824,8 +1003,20 @@ class GameWindow(arcade.Window):
             self.cuphead.shoot_diagonal_up_running = False
             self.cuphead.shoot_diagonal_up_running_left = False
 
+        # Проверка столкновений пуль с сатиром
+        for enemy in self.enemies:
+            hit_list = arcade.check_for_collision_with_list(enemy, self.bullets)
+            for bullet in hit_list:
+                bullet.remove_from_sprite_lists()
+                enemy.take_damage(10)  # Наносим урон через метод
+
     def on_key_press(self, key, modifiers):
-        if self.loose or self.victory or self.cuphead.flexing or self.cuphead.ex_straight:
+        if (
+                self.loose
+                or self.victory
+                or self.cuphead.flexing
+                or self.cuphead.ex_straight
+        ):
             return
 
         if key == arcade.key.LEFT:
@@ -865,7 +1056,12 @@ class GameWindow(arcade.Window):
         elif key == arcade.key.UP:
             self.cuphead.keys_pressed["up"] = True
             # При нажатии UP меняем состояние стрельбы если уже стреляем и на земле
-            if self.cuphead.shooting and not self.cuphead.moving and not self.cuphead.duck and self.cuphead.on_ground:
+            if (
+                    self.cuphead.shooting
+                    and not self.cuphead.moving
+                    and not self.cuphead.duck
+                    and self.cuphead.on_ground
+            ):
                 self.cuphead.shooting_up = True
                 self.cuphead.shooting_straight = False
 
@@ -902,7 +1098,12 @@ class GameWindow(arcade.Window):
                     self.cuphead.count_dash -= 1
 
         # FLEX
-        elif key == arcade.key.F and not self.cuphead.flexing and not self.cuphead.ex_straight:
+        elif (
+                key == arcade.key.F
+                and not self.cuphead.flexing
+                and not self.cuphead.ex_straight
+                and self.cuphead.on_ground
+        ):
             self.cuphead.flexing = True
             self.cuphead.change_x = 0
             self.cuphead.change_y = 0  # Сбрасываем вертикальную скорость
@@ -920,7 +1121,11 @@ class GameWindow(arcade.Window):
             self.cuphead.shooting_diagonal_up = False
 
         # Супер-атака (V)
-        elif key == arcade.key.V and not self.cuphead.ex_straight and not self.cuphead.flexing:
+        elif (
+                key == arcade.key.V
+                and not self.cuphead.ex_straight
+                and not self.cuphead.flexing
+        ):
             self.cuphead.ex_straight = True
             self.cuphead.change_x = 0
             self.cuphead.change_y = 0  # Сбрасываем вертикальную скорость
@@ -937,14 +1142,27 @@ class GameWindow(arcade.Window):
             self.cuphead.duck_shooting = False
             self.cuphead.shooting_diagonal_up = False
 
-        if key == arcade.key.Z and not self.cuphead.flexing and not self.cuphead.ex_straight:
+        if (
+                key == arcade.key.Z
+                and not self.cuphead.flexing
+                and not self.cuphead.ex_straight
+        ):
             self.cuphead.shooting = True
             # При начале стрельбы устанавливаем состояние по умолчанию
-            if not self.cuphead.moving and not self.cuphead.duck and self.cuphead.on_ground:
+            if (
+                    not self.cuphead.moving
+                    and not self.cuphead.duck
+                    and self.cuphead.on_ground
+            ):
                 self.cuphead.shooting_straight = True
 
     def on_key_release(self, key, modifiers):
-        if self.loose or self.victory or self.cuphead.flexing or self.cuphead.ex_straight:
+        if (
+                self.loose
+                or self.victory
+                or self.cuphead.flexing
+                or self.cuphead.ex_straight
+        ):
             return
 
         if key == arcade.key.LEFT:
@@ -956,7 +1174,12 @@ class GameWindow(arcade.Window):
         elif key == arcade.key.UP:
             self.cuphead.keys_pressed["up"] = False
             # При отпускании UP меняем состояние стрельбы только если на земле
-            if self.cuphead.shooting and not self.cuphead.moving and not self.cuphead.duck and self.cuphead.on_ground:
+            if (
+                    self.cuphead.shooting
+                    and not self.cuphead.moving
+                    and not self.cuphead.duck
+                    and self.cuphead.on_ground
+            ):
                 self.cuphead.shooting_up = False
                 self.cuphead.shooting_straight = True
 
