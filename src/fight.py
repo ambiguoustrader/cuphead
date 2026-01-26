@@ -9,19 +9,22 @@ SCREEN_TITLE = "Овощебанда"
 SPEED = 5
 WATER_HEIGHT = SCREEN_HEIGHT // 3
 BULLET_SPEED = 40
+EX_BULLET_SPEED = 80  # Скорость для супер-пуль
 
 
 class Bullet(arcade.Sprite):
-    def __init__(self, x, y, direction_x, direction_y, shoot, angle=0):
+    def __init__(self, x, y, direction_x, direction_y, shoot, angle=0, is_ex=False):
         super().__init__(shoot, scale=0.7)
         self.center_x = x
         self.center_y = y
-        self.change_x = direction_x * BULLET_SPEED
-        self.change_y = direction_y * BULLET_SPEED
+        speed = EX_BULLET_SPEED if is_ex else BULLET_SPEED
+        self.change_x = direction_x * speed
+        self.change_y = direction_y * speed
         self.lifetime = 120
         self.angle = angle  # Угол поворота для диагональных выстрелов
         if angle != 0:
             self.angle = angle  # Устанавливаем угол поворота спрайта
+        self.is_ex = is_ex  # Флаг супер-пули
 
     def update(self, delta_time):
         self.center_x += self.change_x
@@ -56,6 +59,7 @@ class CupHead(arcade.Sprite):
                 "left": [],
             },
             'duck_shoot': {"right": [], "left": []},
+            'ex_straight': {"right": [], "left": []},
         }
 
         for i in range(1, 6):
@@ -208,6 +212,16 @@ class CupHead(arcade.Sprite):
             flipped_texture = texture.flip_left_right()
             self.textures_dict["duck_shoot"]["left"].append(flipped_texture)
 
+        # Загрузка анимации супер-атаки
+        for i in range(1, 16):
+            path = f"images/Special Attck/Straight/Ground/cuphead_ex_straight_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            self.textures_dict["ex_straight"]["right"].append(texture)
+
+        for texture in self.textures_dict["ex_straight"]["right"]:
+            flipped_texture = texture.flip_left_right()
+            self.textures_dict["ex_straight"]["left"].append(flipped_texture)
+
         self.state = "idle"
         self.direction = "right"
         self.current_frame = 0
@@ -223,8 +237,12 @@ class CupHead(arcade.Sprite):
         self.need_dash_teleport = False
         self.dash_direction_multiplier = 1
         self.flexing = False
+        self.ex_straight = False  # Флаг супер-атаки
         self.can_move = True
         self.dashing_back = False
+
+        # Список для хранения созданных пуль
+        self.bullets_to_add = []
 
         # Переменные для дэша
         self.dash_start_moving = False
@@ -270,6 +288,7 @@ class CupHead(arcade.Sprite):
             "shoot_straight_running": 8,
             "shoot_diagonal_up_running": 8,
             "shoot_diagonal_up_running_left": 8,
+            'ex_straight': 6,
         }
 
     def update(self, delta_time):
@@ -279,24 +298,21 @@ class CupHead(arcade.Sprite):
             self.center_x = self.center_x + (50 * (-1, 1)[self.direction == "right"])
             self.key = False
 
-        if self.flexing:
+        if self.ex_straight:
+            new_state = "ex_straight"
+        elif self.flexing:
             new_state = "flex"
-
         elif self.dashing_back:
             new_state = "dash_back"
-
         elif not self.on_ground and not self.dashing:
             # В прыжке оставляем обычную анимацию прыжка
             new_state = "jump"
-
         elif self.dashing:
             new_state = "dash"
-
         # Проверяем стрельбу в приседе
         elif self.shooting and self.duck:
             new_state = "duck_shoot"
             self.duck_shooting = True
-
         # Проверяем стрельбу во время бега
         elif self.shooting and self.moving:
             if self.keys_pressed["up"]:
@@ -314,16 +330,12 @@ class CupHead(arcade.Sprite):
                 self.shoot_diagonal_up_running = False
                 self.shoot_diagonal_up_running_left = False
                 self.shooting_straight = False
-
         elif self.shoot_straight_running:
             new_state = "shoot_straight_running"
-
         elif self.shoot_diagonal_up_running:
             new_state = "shoot_diagonal_up_running"
-
         elif self.shoot_diagonal_up_running_left:
             new_state = "shoot_diagonal_up_running_left"
-
         # Проверяем стрельбу стоя на месте
         elif self.shooting and not self.moving and not self.duck and self.on_ground:
             if self.keys_pressed["up"]:
@@ -339,22 +351,16 @@ class CupHead(arcade.Sprite):
                 self.shooting_straight = True
                 self.shooting_up = False
                 self.shooting_down = False
-
         elif self.shooting_straight:
             new_state = "shoot_straight"
-
         elif self.shooting_diagonal_up:
             new_state = "shoot_diagonal_up"
-
         elif self.shooting_diagonal_down:
             new_state = "shoot_diagonal_down"
-
         elif self.shooting_up:
             new_state = "shoot_up"
-
         elif self.shooting_down:
             new_state = "shoot_down"
-
         elif self.duck:
             if self.state == "duck" and self.duck_direction == 1:
                 if (
@@ -381,7 +387,6 @@ class CupHead(arcade.Sprite):
                 self.duck_direction = 1
                 self.current_frame = 0
                 self.duck_idle = False
-
         elif not self.duck and (self.state in ["duck", "duck_idle", "duck_shoot"]):
             if self.state == "duck_idle":
                 new_state = "duck"
@@ -407,10 +412,8 @@ class CupHead(arcade.Sprite):
                 self.duck_direction = -1
                 self.current_frame = len(self.textures_dict["duck"][self.direction]) - 1
                 self.duck_idle = False
-
         elif self.moving and self.change_x != 0 and not self.duck:
             new_state = "run"
-
         else:
             new_state = "idle"
 
@@ -430,7 +433,23 @@ class CupHead(arcade.Sprite):
                 self.update_texture()
 
     def update_animation_frame(self):
-        if self.state == "flex":
+        if self.state == "ex_straight":
+            textures_list = self.textures_dict["ex_straight"][self.direction]
+            if textures_list:
+                self.can_move = False
+                if self.current_frame < len(textures_list) - 1:
+                    self.current_frame += 1
+                    # Создаем пулю на определенных кадрах анимации
+                    if self.current_frame in [4, 8, 12]:
+                        self.create_ex_bullet()
+                else:
+                    self.can_move = True
+                    self.current_frame = len(textures_list) - 1
+                    self.ex_straight = False
+                    # Восстанавливаем гравитацию после супер-атаки
+                    self.change_y = 0  # Сбрасываем вертикальную скорость
+                return
+        elif self.state == "flex":
             textures_list = self.textures_dict["flex"]["right"]
             if textures_list:
                 self.can_move = False
@@ -440,7 +459,6 @@ class CupHead(arcade.Sprite):
                     self.can_move = True
                     self.current_frame = len(textures_list) - 1
                     self.flexing = False
-                    # ВОССТАНАВЛИВАЕМ ГРАВИТАЦИЮ ПОСЛЕ FLEX
                     self.change_y = 0  # Сбрасываем вертикальную скорость
                 return
 
@@ -603,6 +621,32 @@ class CupHead(arcade.Sprite):
             self.current_frame = 0
             self.animation_speed_counter = 0
 
+    def create_ex_bullet(self):
+        """Создание супер-пули (вызывается из анимации)"""
+        direction_x = 1 if self.direction == "right" else -1
+        direction_y = 0
+        bullet_angle = 0
+
+        # Позиция выстрела
+        flag = self.direction == "right"
+        pull_move = self.center_x + 60 * (-1, 1)[flag]
+        pull_up = self.center_y + 30
+
+        # Текстура для супер-пули
+        shoot = arcade.load_texture("images/Supers/Mega_Blast.png")
+
+        # Для стрельбы влево - зеркалим
+        if not flag:
+            shoot = shoot.flip_left_right()
+
+        # Создаем супер-пулю
+        bullet = Bullet(
+            pull_move, pull_up, direction_x, direction_y, shoot, bullet_angle, is_ex=True
+        )
+
+        # Добавляем пулю в список для добавления
+        self.bullets_to_add.append(bullet)
+
 
 class GameWindow(arcade.Window):
     def __init__(self, width, height, title):
@@ -639,16 +683,22 @@ class GameWindow(arcade.Window):
     def on_update(self, delta_time):
         if self.loose or self.victory:
             return
-        self.all_sprites.update(delta_time)
 
+        self.all_sprites.update(delta_time)
         self.cuphead.update(delta_time)
 
-        # Применяем гравитацию только если не в дэше
+        # Добавляем пули из списка cuphead (супер-атака)
+        for bullet in self.cuphead.bullets_to_add:
+            self.all_sprites.append(bullet)
+        self.cuphead.bullets_to_add.clear()  # Очищаем список после добавления
+
+        # Применяем гравитацию только если не в дэше, не в flex и не в супер-атаке
         if (
                 not self.cuphead.dashing
                 and self.cuphead.can_move
                 and not self.cuphead.dashing_back
                 and not self.cuphead.flexing  # Не применяем гравитацию во время flex
+                and not self.cuphead.ex_straight  # Не применяем гравитацию во время супер-атаки
         ):
             self.cuphead.change_y -= 0.5
 
@@ -775,7 +825,7 @@ class GameWindow(arcade.Window):
             self.cuphead.shoot_diagonal_up_running_left = False
 
     def on_key_press(self, key, modifiers):
-        if self.loose or self.victory or self.cuphead.flexing:
+        if self.loose or self.victory or self.cuphead.flexing or self.cuphead.ex_straight:
             return
 
         if key == arcade.key.LEFT:
@@ -787,6 +837,7 @@ class GameWindow(arcade.Window):
                     and not self.cuphead.dashing_back
                     and not self.cuphead.duck
                     and not self.cuphead.flexing
+                    and not self.cuphead.ex_straight
             ):
                 self.cuphead.change_x = -SPEED
                 self.cuphead.moving = True
@@ -803,6 +854,7 @@ class GameWindow(arcade.Window):
                     and not self.cuphead.dashing_back
                     and not self.cuphead.duck
                     and not self.cuphead.flexing
+                    and not self.cuphead.ex_straight
             ):
                 self.cuphead.change_x = SPEED
                 self.cuphead.moving = True
@@ -831,6 +883,7 @@ class GameWindow(arcade.Window):
                 key == arcade.key.SPACE
                 and self.cuphead.on_ground
                 and not self.cuphead.flexing
+                and not self.cuphead.ex_straight
         ):
             self.cuphead.change_y = 10
             self.cuphead.on_ground = False
@@ -841,6 +894,7 @@ class GameWindow(arcade.Window):
                 and not self.cuphead.dashing
                 and not self.cuphead.dashing_back
                 and not self.cuphead.flexing
+                and not self.cuphead.ex_straight
         ):
             if self.cuphead.count_dash:
                 self.cuphead.start_dash()
@@ -848,7 +902,7 @@ class GameWindow(arcade.Window):
                     self.cuphead.count_dash -= 1
 
         # FLEX
-        elif key == arcade.key.F and not self.cuphead.flexing:
+        elif key == arcade.key.F and not self.cuphead.flexing and not self.cuphead.ex_straight:
             self.cuphead.flexing = True
             self.cuphead.change_x = 0
             self.cuphead.change_y = 0  # Сбрасываем вертикальную скорость
@@ -865,14 +919,32 @@ class GameWindow(arcade.Window):
             self.cuphead.duck_shooting = False
             self.cuphead.shooting_diagonal_up = False
 
-        if key == arcade.key.Z and not self.cuphead.flexing:
+        # Супер-атака (V)
+        elif key == arcade.key.V and not self.cuphead.ex_straight and not self.cuphead.flexing:
+            self.cuphead.ex_straight = True
+            self.cuphead.change_x = 0
+            self.cuphead.change_y = 0  # Сбрасываем вертикальную скорость
+            self.cuphead.moving = False
+            self.cuphead.can_move = False
+            # Останавливаем стрельбу при начале супер-атаки
+            self.cuphead.shooting = False
+            self.cuphead.shooting_straight = False
+            self.cuphead.shooting_up = False
+            self.cuphead.shooting_down = False
+            self.cuphead.shoot_straight_running = False
+            self.cuphead.shoot_diagonal_up_running = False
+            self.cuphead.shoot_diagonal_up_running_left = False
+            self.cuphead.duck_shooting = False
+            self.cuphead.shooting_diagonal_up = False
+
+        if key == arcade.key.Z and not self.cuphead.flexing and not self.cuphead.ex_straight:
             self.cuphead.shooting = True
             # При начале стрельбы устанавливаем состояние по умолчанию
             if not self.cuphead.moving and not self.cuphead.duck and self.cuphead.on_ground:
                 self.cuphead.shooting_straight = True
 
     def on_key_release(self, key, modifiers):
-        if self.loose or self.victory:
+        if self.loose or self.victory or self.cuphead.flexing or self.cuphead.ex_straight:
             return
 
         if key == arcade.key.LEFT:
@@ -897,6 +969,7 @@ class GameWindow(arcade.Window):
                     not self.cuphead.dashing
                     and not self.cuphead.dashing_back
                     and not self.cuphead.flexing
+                    and not self.cuphead.ex_straight
             ):
                 any_key_pressed = (
                         self.cuphead.keys_pressed["left"]
@@ -917,6 +990,7 @@ class GameWindow(arcade.Window):
                 and not self.cuphead.dashing_back
                 and not self.cuphead.duck
                 and not self.cuphead.flexing
+                and not self.cuphead.ex_straight
         ):
             if key == arcade.key.LEFT and self.cuphead.change_x < 0:
                 if self.cuphead.keys_pressed["right"]:
