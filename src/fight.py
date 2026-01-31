@@ -4,7 +4,7 @@ from itertools import cycle
 import math
 
 SCREEN_WIDTH = 1400
-SCREEN_HEIGHT = 800
+SCREEN_HEIGHT = 600
 SCREEN_TITLE = "Овощебанда"
 SPEED = 5
 WATER_HEIGHT = SCREEN_HEIGHT // 3
@@ -22,7 +22,6 @@ class Satyr(arcade.Sprite):
         self.center_y = y
         self.change_x = direction_x * 2  # Скорость движения
         self.change_y = 0
-        self.hp = 100
 
         # Направление и состояния
         self.direction = "right" if direction_x > 0 else "left"
@@ -35,6 +34,9 @@ class Satyr(arcade.Sprite):
         self.start_jump_complete = False  # Флаг завершения начального прыжка
         self.jump_phase = "up"  # Фаза прыжка: "up" или "down"
         self.jump_frames = 0  # Счетчик кадров прыжка
+        self.hp = 30  # Увеличиваем HP сатира
+        self.invincible = False  # Флаг неуязвимости
+        self.invincible_timer = 0  # Таймер неуязвимости
 
         # Загрузка текстур
         self.textures_dict = {
@@ -45,7 +47,9 @@ class Satyr(arcade.Sprite):
 
         # Загрузка анимации прыжка
         for i in range(1, 20):
-            path = f"images/Satyr/Jump/lv3-2_satyr_jump_{'0' * (4 - len(str(i)))}{i}.png"
+            path = (
+                f"images/Satyr/Jump/lv3-2_satyr_jump_{'0' * (4 - len(str(i)))}{i}.png"
+            )
             texture = arcade.load_texture(path)
             self.textures_dict["jump"]["left"].append(texture)
 
@@ -55,7 +59,9 @@ class Satyr(arcade.Sprite):
 
         # Загрузка анимации бега/пропуска
         for i in range(1, 25):
-            path = f"images/Satyr/Skip/lv3-2_satyr_skip_{'0' * (4 - len(str(i)))}{i}.png"
+            path = (
+                f"images/Satyr/Skip/lv3-2_satyr_skip_{'0' * (4 - len(str(i)))}{i}.png"
+            )
             texture = arcade.load_texture(path)
             self.textures_dict["run"]["left"].append(texture)
 
@@ -65,7 +71,9 @@ class Satyr(arcade.Sprite):
 
         # Загрузка анимации поворота
         for i in range(1, 5):
-            path = f"images/Satyr/Turn/lv3-2_satyr_turn_{'0' * (4 - len(str(i)))}{i}.png"
+            path = (
+                f"images/Satyr/Turn/lv3-2_satyr_turn_{'0' * (4 - len(str(i)))}{i}.png"
+            )
             texture = arcade.load_texture(path)
             self.textures_dict["turn"]["left"].append(texture)
 
@@ -78,6 +86,16 @@ class Satyr(arcade.Sprite):
 
     def update(self, delta_time):
         """Обновление состояния сатира"""
+        # Если у сатира не осталось HP, не обновляем его
+        if self.hp <= 0:
+            return
+
+        # Обновление таймера неуязвимости
+        if self.invincible:
+            self.invincible_timer -= 1
+            if self.invincible_timer <= 0:
+                self.invincible = False
+
         super().update()
 
         # Обновление анимации
@@ -92,12 +110,14 @@ class Satyr(arcade.Sprite):
             self.jump_frames += 1
 
             # Кадры 0-9: прыжок
-            if self.jump_frames <= 20:  # Первые 20 обновлений (примерно 5 кадров анимации)
+            if (
+                    self.jump_frames <= 20
+            ):  # Первые 20 обновлений (примерно 5 кадров анимации)
                 # Поднимаемся
-                self.change_y = 8
+                self.change_y = 10
             elif self.jump_frames <= 40:  # Следующие 20 обновлений (кадры 5-10)
                 # Падаем
-                self.change_y = -6
+                self.change_y = -4
             else:
                 # Завершаем прыжок, включаем обычную гравитацию
                 self.start_jump_complete = True
@@ -174,14 +194,19 @@ class Satyr(arcade.Sprite):
 
     def take_damage(self, damage):
         """Принять урон"""
-        self.hp -= damage
-        if self.hp <= 0:
-            self.remove_from_sprite_lists()
+        if not self.invincible:  # Получаем урон только если не неуязвимы
+            self.hp -= damage
+            if self.hp <= 0:
+                self.remove_from_sprite_lists()
 
 
 class Bullet(arcade.Sprite):
     def __init__(self, x, y, direction_x, direction_y, shoot, angle=0, is_ex=False):
-        super().__init__(shoot, scale=0.7)
+        if is_ex:
+            scale = 1.2
+        else:
+            scale = 0.7
+        super().__init__(shoot, scale=scale)
         self.center_x = x
         self.center_y = y
         speed = EX_BULLET_SPEED if is_ex else BULLET_SPEED
@@ -192,6 +217,7 @@ class Bullet(arcade.Sprite):
         if angle != 0:
             self.angle = angle  # Устанавливаем угол поворота спрайта
         self.is_ex = is_ex  # Флаг супер-пули
+        self.damage = 30 if is_ex else 5  # Урон от пули
 
     def update(self, delta_time):
         self.center_x += self.change_x
@@ -217,8 +243,8 @@ class CupHead(arcade.Sprite):
             "shoot_straight": {"right": [], "left": []},
             "shoot_up": {"right": [], "left": []},
             "shoot_down": {"right": [], "left": []},
-            "shoot_diagonal_down": {"right": [], "left": []},
             "shoot_diagonal_up": {"right": [], "left": []},
+            "shoot_diagonal_down": {"right": [], "left": []},
             "shoot_straight_running": {"right": [], "left": []},
             "shoot_diagonal_up_running": {"right": [], "left": []},
             "shoot_diagonal_up_running_left": {
@@ -227,6 +253,9 @@ class CupHead(arcade.Sprite):
             },
             "duck_shoot": {"right": [], "left": []},
             "ex_straight": {"right": [], "left": []},
+            "hit": {"right": [], "left": []},
+            "death": {"right": [], "left": []},
+            "ghost": {"right": [], "left": []},
         }
 
         for i in range(1, 6):
@@ -379,7 +408,6 @@ class CupHead(arcade.Sprite):
             flipped_texture = texture.flip_left_right()
             self.textures_dict["duck_shoot"]["left"].append(flipped_texture)
 
-        # Загрузка анимации супер-атаки
         for i in range(1, 16):
             path = f"images/Special Attck/Straight/Ground/cuphead_ex_straight_{'0' * (4 - len(str(i)))}{i}.png"
             texture = arcade.load_texture(path)
@@ -388,6 +416,33 @@ class CupHead(arcade.Sprite):
         for texture in self.textures_dict["ex_straight"]["right"]:
             flipped_texture = texture.flip_left_right()
             self.textures_dict["ex_straight"]["left"].append(flipped_texture)
+
+        for i in range(1, 7):
+            path = f"images/Hit/Ground/cuphead_hit_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            self.textures_dict["hit"]["right"].append(texture)
+
+        for texture in self.textures_dict["hit"]["right"]:
+            flipped_texture = texture.flip_left_right()
+            self.textures_dict["hit"]["left"].append(flipped_texture)
+
+        for i in range(1, 17):
+            path = f"images/Death/cuphead_death_body_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            self.textures_dict["death"]["right"].append(texture)
+
+        for texture in self.textures_dict["death"]["right"]:
+            flipped_texture = texture.flip_left_right()
+            self.textures_dict["death"]["left"].append(flipped_texture)
+
+        for i in range(1, 25):
+            path = f"images/Ghost/cuphead_ghost_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            self.textures_dict["ghost"]["right"].append(texture)
+
+        for texture in self.textures_dict["ghost"]["right"]:
+            flipped_texture = texture.flip_left_right()
+            self.textures_dict["ghost"]["left"].append(flipped_texture)
 
         self.state = "idle"
         self.direction = "right"
@@ -407,6 +462,12 @@ class CupHead(arcade.Sprite):
         self.ex_straight = False  # Флаг супер-атаки
         self.can_move = True
         self.dashing_back = False
+        self.death = False
+        self.hp = 3
+        self.invincible = False  # Флаг неуязвимости
+        self.invincible_timer = 0  # Таймер неуязвимости
+        self.just_took_damage = False  # Флаг только что получил урон
+        self.disable_input = False  # Флаг отключения ввода
 
         # Список для хранения созданных пуль
         self.bullets_to_add = []
@@ -435,6 +496,11 @@ class CupHead(arcade.Sprite):
         self.shoot_diagonal_up_running_left = False
         self.duck_shooting = False
 
+        self.hit = False
+        self.hit_check = False
+
+        self.ghost = False
+
         self.animation_speeds = {
             "idle": 8,
             "run": 4,
@@ -454,16 +520,53 @@ class CupHead(arcade.Sprite):
             "shoot_diagonal_up_running": 8,
             "shoot_diagonal_up_running_left": 8,
             "ex_straight": 6,
+            "hit": 5,
+            "death": 5,
+            "ghost": 5,
         }
 
     def update(self, delta_time):
         super().update()
 
+        # Если уже призрак, обрабатываем отдельно
+        if self.ghost:
+            self.process_ghost_state()
+            return
+
+        # Если умер, останавливаем движение и выходим
+        if self.death:
+            self.change_x = 0
+            self.change_y = 0
+            self.moving = False
+            self.can_move = False
+            self.disable_input = True
+            # Пропускаем обычную логику и переходим сразу к смерти
+            self.update_death_animation()
+            return
+
+        # Обновление таймера неуязвимости
+        if self.invincible:
+            self.invincible_timer -= 1
+            if self.invincible_timer <= 0:
+                self.invincible = False
+                self.alpha = 255  # Восстанавливаем полную видимость
+            else:
+                # Мерцание при неуязвимости
+                if self.invincible_timer % 4 < 2:
+                    self.alpha = 128
+                else:
+                    self.alpha = 255
+
         if self.key:
             self.center_x = self.center_x + (50 * (-1, 1)[self.direction == "right"])
             self.key = False
 
-        if self.ex_straight:
+        if self.hp <= 0:
+            self.death = True
+            new_state = "death"
+        elif self.hit:
+            new_state = "hit"
+        elif self.ex_straight:
             new_state = "ex_straight"
         elif self.flexing:
             new_state = "flex"
@@ -594,11 +697,83 @@ class CupHead(arcade.Sprite):
 
             if animation_speed > 0 and self.animation_speed_counter >= animation_speed:
                 self.animation_speed_counter = 0
-                self.update_animation_frame()
+                self.update_animation()
                 self.update_texture()
 
-    def update_animation_frame(self):
+    def process_ghost_state(self):
+        """Обработка состояния призрака"""
+        if not self.ghost:
+            return
+
+        # Устанавливаем состояние ghost если еще не установлено
+        if self.state != "ghost":
+            self.state = "ghost"
+            self.current_frame = 0
+            self.animation_speed_counter = 0
+
+        # Обновляем анимацию призрака
+        self.animation_speed_counter += 1
+        if self.animation_speed_counter >= self.animation_speeds["ghost"]:
+            self.animation_speed_counter = 0
+            self.update_ghost_animation()
+
+        # Двигаем призрака вверх
+        self.change_y = 3
+
+        # Проверяем, улетел ли призрак за пределы экрана
+        if self.bottom > SCREEN_HEIGHT:
+            self.remove_from_sprite_lists()
+
+    def update_ghost_animation(self):
+        """Обновление анимации призрака"""
+        textures_list = self.textures_dict["ghost"]["right"]
+        if textures_list:
+            self.current_frame = (self.current_frame + 1) % len(textures_list)
+            self.texture = textures_list[self.current_frame]
+
+    def update_death_animation(self):
+        """Отдельный метод для анимации смерти"""
+        textures_list = self.textures_dict["death"]["right"]
+        if textures_list:
+            if self.current_frame < len(textures_list) - 1:
+                self.animation_speed_counter += 1
+                if self.animation_speed_counter >= self.animation_speeds["death"]:
+                    self.animation_speed_counter = 0
+                    self.current_frame += 1
+                    self.texture = textures_list[self.current_frame]
+            else:
+                # Анимация смерти завершена - переходим в состояние призрака
+                self.ghost = True
+                self.state = "ghost"
+                self.current_frame = 0
+                self.animation_speed_counter = 0
+                self.change_y = 5  # Начинаем подниматься
+
+    def update_animation(self):
+        """Обновление анимации"""
+        if self.state == "death":
+            return  # Обрабатывается отдельно в update_death_animation()
+
+        if self.state == "hit":
+            self.hit_check = True
+            textures_list = self.textures_dict["hit"][self.direction]
+            if textures_list:
+                # Останавливаем движение при получении урона
+
+                if self.current_frame < len(textures_list) - 1:
+                    self.current_frame += 1
+                else:
+                    # Активируем временную неуязвимость после получения урона
+                    self.invincible = True
+                    self.invincible_timer = 120  # 2 секунды при 60 FPS
+                    self.can_move = True
+                    self.hit = False
+                    self.hit_check = False
+                    self.just_took_damage = False  # Сбрасываем флаг
+                return
+
         if self.state == "ex_straight":
+            self.hit_check = False
             textures_list = self.textures_dict["ex_straight"][self.direction]
             if textures_list:
                 self.can_move = False
@@ -614,6 +789,7 @@ class CupHead(arcade.Sprite):
                     # Восстанавливаем гравитацию после супер-атаки
                     self.change_y = 0  # Сбрасываем вертикальную скорость
                 return
+
         elif self.state == "flex":
             textures_list = self.textures_dict["flex"]["right"]
             if textures_list:
@@ -795,7 +971,7 @@ class CupHead(arcade.Sprite):
         # Позиция выстрела
         flag = self.direction == "right"
         pull_move = self.center_x + 60 * (-1, 1)[flag]
-        pull_up = self.center_y - 20
+        pull_up = self.center_y
 
         # Текстура для супер-пули
         shoot = arcade.load_texture("images/Supers/Mega_Blast.png")
@@ -818,6 +994,32 @@ class CupHead(arcade.Sprite):
         # Добавляем пулю в список для добавления
         self.bullets_to_add.append(bullet)
 
+    def take_damage(self):
+        """Получить урон"""
+        if not self.invincible and not self.just_took_damage:
+            self.hp -= 1
+            self.hit = True
+            self.just_took_damage = True
+            self.invincible = True
+            self.invincible_timer = 120  # 2 секунды неуязвимости
+
+            # Останавливаем все действия при получении урона
+            self.shooting = False
+            self.shooting_straight = False
+            self.shooting_up = False
+            self.shooting_down = False
+            self.shoot_straight_running = False
+            self.shoot_diagonal_up_running = False
+            self.shoot_diagonal_up_running_left = False
+            self.duck_shooting = False
+            self.shooting_diagonal_up = False
+            self.dashing = False
+            self.dashing_back = False
+            self.flexing = False
+            self.ex_straight = False
+            self.change_x = 0
+            self.moving = False
+
 
 class GameWindow(arcade.Window):
     def __init__(self, width, height, title):
@@ -833,7 +1035,8 @@ class GameWindow(arcade.Window):
         self.cuphead.center_y = 100
         self.cuphead.change_x = 0
         self.cuphead.change_y = 0
-        self.satyr = Satyr(random.randint(50, 750), 70, -1)
+        self.cuphead.alpha = 255  # Инициализируем альфа-канал
+        self.satyr = Satyr(random.randint(50, 750), 100, -1)
         self.pull = cycle((15, 0, -15))
 
         self.victory = False
@@ -861,15 +1064,26 @@ class GameWindow(arcade.Window):
         if self.loose or self.victory:
             return
 
+        # Сначала обновляем спрайты
         self.all_sprites.update(delta_time)
         self.bullets.update(delta_time)
-        self.enemies.update(delta_time)  # Теперь вызываем без параметра hits
+        self.enemies.update(delta_time)
         self.cuphead.update(delta_time)
+
+        # Если капхед умер, не обновляем остальную логику
+        if self.cuphead.death:
+            return
 
         # Добавляем пули из списка cuphead (супер-атака)
         for bullet in self.cuphead.bullets_to_add:
             self.bullets.append(bullet)
         self.cuphead.bullets_to_add.clear()  # Очищаем список после добавления
+
+        # Проверка столкновений с врагами
+        check_enemies = arcade.check_for_collision_with_list(self.cuphead, self.enemies)
+        if check_enemies:
+            # Вместо прямого уменьшения HP, вызываем метод take_damage
+            self.cuphead.take_damage()
 
         # Применяем гравитацию только если не в дэше, не в flex и не в супер-атаке
         if (
@@ -878,6 +1092,7 @@ class GameWindow(arcade.Window):
                 and not self.cuphead.dashing_back
                 and not self.cuphead.flexing  # Не применяем гравитацию во время flex
                 and not self.cuphead.ex_straight  # Не применяем гравитацию во время супер-атаки
+                and not self.cuphead.hit  # Не применяем гравитацию во время получения урона
         ):
             self.cuphead.change_y -= 0.5
 
@@ -1007,15 +1222,22 @@ class GameWindow(arcade.Window):
         for enemy in self.enemies:
             hit_list = arcade.check_for_collision_with_list(enemy, self.bullets)
             for bullet in hit_list:
-                bullet.remove_from_sprite_lists()
-                enemy.take_damage(10)  # Наносим урон через метод
+                if bullet in self.bullets:  # Проверяем, что пуля еще существует
+                    bullet.remove_from_sprite_lists()
+                if enemy in self.enemies:  # Проверяем, что враг еще существует
+                    enemy.take_damage(bullet.damage)  # Наносим урон через метод
 
     def on_key_press(self, key, modifiers):
+        # Если капхед умер или отключен ввод, игнорируем нажатия
+        if self.cuphead.death or self.cuphead.disable_input:
+            return
+
         if (
                 self.loose
                 or self.victory
                 or self.cuphead.flexing
                 or self.cuphead.ex_straight
+                or self.cuphead.hit  # Не обрабатываем ввод во время получения урона
         ):
             return
 
@@ -1157,19 +1379,40 @@ class GameWindow(arcade.Window):
                 self.cuphead.shooting_straight = True
 
     def on_key_release(self, key, modifiers):
+        # Если капхед умер или отключен ввод, игнорируем отпускания клавиш
+        if self.cuphead.death or self.cuphead.disable_input:
+            return
+
         if (
                 self.loose
                 or self.victory
                 or self.cuphead.flexing
                 or self.cuphead.ex_straight
+                or self.cuphead.hit  # Не обрабатываем ввод во время получения урона
         ):
             return
 
         if key == arcade.key.LEFT:
             self.cuphead.keys_pressed["left"] = False
+            # Если отпустили LEFT и не нажата правая кнопка, останавливаем движение
+            if (
+                    not self.cuphead.keys_pressed["right"]
+                    and not self.cuphead.dashing
+                    and not self.cuphead.dashing_back
+            ):
+                self.cuphead.change_x = 0
+                self.cuphead.moving = False
 
         elif key == arcade.key.RIGHT:
             self.cuphead.keys_pressed["right"] = False
+            # Если отпустили RIGHT и не нажата левая кнопка, останавливаем движение
+            if (
+                    not self.cuphead.keys_pressed["left"]
+                    and not self.cuphead.dashing
+                    and not self.cuphead.dashing_back
+            ):
+                self.cuphead.change_x = 0
+                self.cuphead.moving = False
 
         elif key == arcade.key.UP:
             self.cuphead.keys_pressed["up"] = False
@@ -1207,6 +1450,9 @@ class GameWindow(arcade.Window):
                         self.cuphead.change_x = SPEED
                         self.cuphead.moving = True
                         self.cuphead.change_direction("right")
+                else:
+                    self.cuphead.change_x = 0
+                    self.cuphead.moving = False
 
         if (
                 not self.cuphead.dashing
@@ -1258,3 +1504,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
