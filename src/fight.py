@@ -4,39 +4,452 @@ from itertools import cycle
 import math
 
 SCREEN_WIDTH = 1400
-SCREEN_HEIGHT = 600
+SCREEN_HEIGHT = 900
 SCREEN_TITLE = "Овощебанда"
 SPEED = 5
 WATER_HEIGHT = SCREEN_HEIGHT // 3
 BULLET_SPEED = 40
 EX_BULLET_SPEED = 30  # Скорость для супер-пуль
+DRAGON_FIRE_SPEED = 8  # Скорость снаряда дракона
+
+
+class DragonFire(arcade.Sprite):
+    # Кеширование текстур для оптимизации
+    _texture_cache_normal = None
+    _texture_cache_pink = None
+
+    @classmethod
+    def _load_textures(cls, is_pink=False):
+        """Загружаем текстуры один раз и кешируем их"""
+        if is_pink:
+            if cls._texture_cache_pink is not None:
+                return cls._texture_cache_pink
+
+            text = "Pink/lv3-2_baby_dragon_fireball_pink_"
+        else:
+            if cls._texture_cache_normal is not None:
+                return cls._texture_cache_normal
+
+            text = "Normal/lv3-2_baby_dragon_fireball_"
+
+        textures_list = []
+        for i in range(1, 21):
+            texture = arcade.load_texture(f"images/Baby Dragon/{text}{'0' * (4 - len(str(i)))}{i}.png")
+            textures_list.append(texture)
+
+        # Кешируем загруженные текстуры
+        if is_pink:
+            cls._texture_cache_pink = textures_list
+        else:
+            cls._texture_cache_normal = textures_list
+
+        return textures_list
+
+    def __init__(self, x, y, target_x, target_y, is_pink=False):
+        scale = 1
+        # Загружаем текстуры из кеша
+        self.textures_list = DragonFire._load_textures(is_pink)
+
+        # Используем первую текстуру для создания спрайта
+        super().__init__(self.textures_list[0], scale=scale)
+        self.center_x = x
+        self.center_y = y
+        self.lifetime = 180
+
+        # Вычисляем направление к цели (игроку)
+        dx = target_x - x
+        dy = target_y - y
+        distance = math.sqrt(dx ** 2 + dy ** 2)
+
+        if distance > 0:
+            self.change_x = (dx / distance) * DRAGON_FIRE_SPEED
+            self.change_y = (dy / distance) * DRAGON_FIRE_SPEED
+
+            # Вычисляем угол поворота для спрайта
+            self.angle = math.degrees(math.atan2(dy, dx))
+
+            # Поворачиваем текстуру
+            if self.angle < -90 or self.angle > 90:
+                self.texture = self.texture.flip_left_right()
+        else:
+            self.change_x = 0
+            self.change_y = 0
+            self.angle = 0
+
+        self.damage = 30
+        self.is_pink = is_pink
+        self.can_be_parried = is_pink  # Только розовые снаряды можно парировать
+        self.current_frame = 0
+        self.counter = 0
+
+    def update(self, delta_time):
+        self.counter += 1
+        if self.counter >= 3:
+            self.current_frame = (self.current_frame + 1) % len(self.textures_list)
+            self.counter = 0
+
+        # Получаем текстуру из кешированного списка
+        self.texture = self.textures_list[self.current_frame]
+
+        # Применяем отражение если нужно
+        if self.angle < -90 or self.angle > 90:
+            self.texture = self.texture.flip_left_right()
+
+        self.center_x += self.change_x
+        self.center_y += self.change_y
+        self.lifetime -= 1
+        if self.lifetime <= 0:
+            self.remove_from_sprite_lists()
+
+        # Удаляем если вылетел за экран
+        if (
+                self.right < 0
+                or self.left > SCREEN_WIDTH
+                or self.bottom > SCREEN_HEIGHT
+                or self.top < 0
+        ):
+            self.remove_from_sprite_lists()
+
+
+class BabyDragon(arcade.Sprite):
+    # Кеширование текстур для оптимизации
+    _texture_cache_idle = None
+    _texture_cache_fly_up = None
+    _texture_cache_attack = None
+
+    @classmethod
+    def _load_textures(cls):
+        """Загружаем текстуры один раз и кешируем их"""
+        if (cls._texture_cache_idle is not None and
+                cls._texture_cache_fly_up is not None and
+                cls._texture_cache_attack is not None):
+            return
+
+        idle_textures = []
+        fly_up_textures = []
+        attack_textures = []
+
+        for i in range(1, 20):
+            path = f"images/Baby Dragon/Down/Idle/lv3-2_baby_dragon_idle_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            idle_textures.append(texture)
+
+        for i in range(1, 6):
+            path = f"images/Baby Dragon/Down/Fly up/lv3-2_baby_dragon_fly_up_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            fly_up_textures.append(texture)
+
+        for i in range(1, 28):
+            path = f"images/Baby Dragon/Down/Attack/lv3-2_baby_dragon_attack_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            attack_textures.append(texture)
+
+        cls._texture_cache_idle = idle_textures
+        cls._texture_cache_fly_up = fly_up_textures
+        cls._texture_cache_attack = attack_textures
+
+    def __init__(self, x, y, direction_x, shoot):
+        # Загружаем текстуры в кеш если еще не загружены
+        BabyDragon._load_textures()
+
+        # Используем первую текстуру из кеша
+        super().__init__(BabyDragon._texture_cache_idle[0])
+
+        self.center_x = x
+        self.center_y = SCREEN_HEIGHT + 100
+        self.change_x = 0
+        self.change_y = -3
+
+        self.direction = "left"
+        self.state = "idle"
+        self.current_frame = 0
+        self.animation_speed_counter = 0
+        self.animation_speed = 4
+        self.hp = 30
+        self.invincible = False
+        self.invincible_timer = 0
+        self.can_damage = False
+        self.is_dead = False
+        self.target_y = 600
+        self.attack_done = False
+        self.disappear = False
+
+        # Таймер для стрельбы
+        self.shoot_timer = 0
+        self.shoot_cooldown = 60
+        self.can_shoot = False
+        self.is_pink = shoot
+
+    def update(self, delta_time):
+        """Обновление состояния BabyDragon"""
+        if self.is_dead or self.disappear:
+            return
+
+        super().update()
+
+        # Обновление анимации
+        self.animation_speed_counter += 1
+        if self.animation_speed_counter >= self.animation_speed:
+            self.animation_speed_counter = 0
+            self.update_animation()
+            self.update_texture()
+
+        # Обновление позиции
+        self.center_x += self.change_x
+        self.center_y += self.change_y
+
+        if self.state == "idle":
+            # Плавно спускаемся к целевой высоте
+            if self.center_y <= self.target_y:
+                self.state = "attack"
+                self.change_y = 0
+                self.current_frame = 0
+                self.animation_speed_counter = 0
+                self.can_damage = True
+                self.can_shoot = True
+
+        elif self.state == "attack":
+            # Атака проигрывается один раз
+            if not self.attack_done:
+                # Проверяем, завершилась ли анимация атаки
+                if self.current_frame >= len(BabyDragon._texture_cache_attack) - 1:
+                    self.attack_done = True
+                    # После атаки начинаем подъем
+                    self.state = "fly_up"
+                    self.current_frame = 0
+                    self.animation_speed_counter = 0
+                    self.change_y = 5
+                    self.can_damage = False
+                    self.can_shoot = False
+
+        elif self.state == "fly_up":
+            # Поднимаемся вверх
+            if self.center_y > SCREEN_HEIGHT + 100:
+                self.disappear = True
+                self.remove_from_sprite_lists()
+
+        # Обновление таймера стрельбы
+        if self.can_shoot:
+            self.shoot_timer += 1
+
+    def shoot_at_player(self, player):
+        """Стреляет в игрока, если можно"""
+        if not self.can_shoot or self.shoot_timer < self.shoot_cooldown:
+            return None
+
+        # Создаем снаряд, который летит в игрока
+        fireball = DragonFire(
+            self.center_x, self.center_y, player.center_x, player.center_y, self.is_pink
+        )
+
+        # Сбрасываем таймер
+        self.shoot_timer = 0
+
+        return fireball
+
+    def update_animation(self):
+        """Обновление анимации"""
+        if self.state == "idle":
+            self.current_frame = (self.current_frame + 1) % len(BabyDragon._texture_cache_idle)
+
+        elif self.state == "attack":
+            if not self.attack_done:
+                if self.current_frame < len(BabyDragon._texture_cache_attack) - 1:
+                    self.current_frame += 1
+
+        elif self.state == "fly_up":
+            self.current_frame = (self.current_frame + 1) % len(BabyDragon._texture_cache_fly_up)
+
+    def update_texture(self):
+        """Обновление текущей текстуры спрайта"""
+        if self.state == "idle":
+            self.texture = BabyDragon._texture_cache_idle[self.current_frame]
+
+        elif self.state == "attack":
+            self.texture = BabyDragon._texture_cache_attack[self.current_frame]
+
+        elif self.state == "fly_up":
+            self.texture = BabyDragon._texture_cache_fly_up[self.current_frame]
+
+    def take_damage(self, damage):
+        """Принять урон"""
+        if not self.invincible and not self.is_dead and not self.disappear:
+            self.hp -= damage
+            if self.hp <= 0:
+                self.is_dead = True
+                self.can_damage = False
+                self.can_shoot = False
+                self.remove_from_sprite_lists()
+
+
+class Mudman(arcade.Sprite):
+    def __init__(self, x, y, direction_x, shoot=None):
+        texture = arcade.load_texture(
+            "images/Mudman/Intro/lv3-2_mudman_small_intro_0001.png"
+        )
+        super().__init__(texture)
+
+        self.center_x = x
+        self.center_y = y
+        self.change_x = 0  # Mudman не двигается
+        self.change_y = 0
+
+        self.direction = "right" if direction_x > 0 else "left"
+        self.start = True  # Флаг начальной анимации (intro)
+        self.on_ground = False
+        self.state = "intro"
+        self.current_frame = 0
+        self.animation_speed_counter = 0
+        self.animation_speed = 4
+        self.start_intro_complete = False
+        self.hp = 30
+        self.invincible = False
+        self.invincible_timer = 0
+        self.can_damage = False
+        self.is_dead = False  # Флаг смерти
+
+        # Загрузка текстур
+        self.textures_dict = {
+            "intro": {"right": [], "left": []},
+            "splash": {"right": [], "left": []},
+        }
+
+        for i in range(1, 22):
+            path = f"images/Mudman/Intro/lv3-2_mudman_small_intro_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            self.textures_dict["intro"]["left"].append(texture)
+
+        for texture in self.textures_dict["intro"]["left"]:
+            flipped_texture = texture.flip_left_right()
+            self.textures_dict["intro"]["right"].append(flipped_texture)
+
+        for i in range(1, 11):
+            path = f"images/Mudman/Splash/Small/One/lv3-2_mudman_small_splash_one_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            self.textures_dict["splash"]["left"].append(texture)
+
+        for texture in self.textures_dict["splash"]["left"]:
+            flipped_texture = texture.flip_left_right()
+            self.textures_dict["splash"]["right"].append(flipped_texture)
+
+        # Устанавливаем начальную текстуру
+        self.update_texture()
+
+    def update(self, delta_time):
+        """Обновление состояния Mudman"""
+        # Если Mudman мертв и проигрывает анимацию splash, продолжаем обновление
+        if self.is_dead:
+            # Обновляем анимацию смерти
+            self.animation_speed_counter += 1
+            if self.animation_speed_counter >= self.animation_speed:
+                self.animation_speed_counter = 0
+                self.update_animation()
+                self.update_texture()
+            return
+
+        # Если у Mudman не осталось HP, начинаем анимацию смерти
+        if self.hp <= 0 and not self.is_dead:
+            self.is_dead = True
+            self.state = "splash"
+            self.current_frame = 0
+            self.animation_speed_counter = 0
+            self.can_damage = False  # Больше не может наносить урон
+            return
+
+        # Обновление таймера неуязвимости
+        if self.invincible:
+            self.invincible_timer -= 1
+            if self.invincible_timer <= 0:
+                self.invincible = False
+
+        super().update()
+
+        # Обновление анимации
+        self.animation_speed_counter += 1
+        if self.animation_speed_counter >= self.animation_speed:
+            self.animation_speed_counter = 0
+            self.update_animation()
+            self.update_texture()
+
+        # После завершения анимации появления, Mudman может наносить урон
+        if self.start and not self.start_intro_complete:
+            # Проигрываем анимацию intro
+            if (
+                    self.current_frame
+                    >= len(self.textures_dict["intro"][self.direction]) - 1
+            ):
+                self.start_intro_complete = True
+                self.start = False
+                self.state = (
+                    "intro"  # Остаемся в состоянии intro, но уже завершили анимацию
+                )
+                self.can_damage = True  # Теперь может наносить урон
+        elif not self.start and self.start_intro_complete:
+            self.can_damage = True
+
+    def update_animation(self):
+        """Обновление анимации"""
+        if self.state == "intro":
+            textures_list = self.textures_dict["intro"][self.direction]
+            if textures_list:
+                if not self.start_intro_complete:
+                    # Проигрываем анимацию появления до конца
+                    if self.current_frame < len(textures_list) - 1:
+                        self.current_frame += 1
+        elif self.state == "splash":
+            textures_list = self.textures_dict["splash"][self.direction]
+            if textures_list:
+                if self.current_frame < len(textures_list) - 1:
+                    self.current_frame += 1
+                else:
+                    # Анимация смерти завершена - удаляем спрайт
+                    self.remove_from_sprite_lists()
+
+    def update_texture(self):
+        """Обновление текущей текстуры спрайта"""
+        textures_list = self.textures_dict[self.state][self.direction]
+        if textures_list and 0 <= self.current_frame < len(textures_list):
+            self.texture = textures_list[self.current_frame]
+
+    def take_damage(self, damage):
+        """Принять урон"""
+        if (
+                not self.invincible and not self.is_dead
+        ):  # Получаем урон только если не неуязвимы и не мертвы
+            self.hp -= damage
+            if self.hp <= 0:
+                # Не удаляем сразу, начинаем анимацию смерти
+                self.is_dead = True
+                self.state = "splash"
+                self.current_frame = 0
+                self.animation_speed_counter = 0
+                self.can_damage = False
 
 
 class Satyr(arcade.Sprite):
-    def __init__(self, x, y, direction_x):
-        # Используем базовую текстуру
+    def __init__(self, x, y, direction_x, shoot=None):
         texture = arcade.load_texture("images/Satyr/Jump/lv3-2_satyr_jump_0001.png")
         super().__init__(texture)
 
         self.center_x = x
         self.center_y = y
-        self.change_x = direction_x * 2  # Скорость движения
+        self.change_x = direction_x * 2
         self.change_y = 0
 
-        # Направление и состояния
         self.direction = "right" if direction_x > 0 else "left"
-        self.start = True  # Флаг начальной анимации прыжка
+        self.start = True
         self.on_ground = False
         self.state = "jump"
         self.current_frame = 0
         self.animation_speed_counter = 0
-        self.animation_speed = 4  # Скорость анимации
-        self.start_jump_complete = False  # Флаг завершения начального прыжка
-        self.jump_phase = "up"  # Фаза прыжка: "up" или "down"
-        self.jump_frames = 0  # Счетчик кадров прыжка
-        self.hp = 30  # Увеличиваем HP сатира
-        self.invincible = False  # Флаг неуязвимости
-        self.invincible_timer = 0  # Таймер неуязвимости
+        self.animation_speed = 4
+        self.start_jump_complete = False
+        self.jump_phase = "up"
+        self.jump_frames = 0
+        self.hp = 30
+        self.invincible = False
+        self.invincible_timer = 0
+        self.can_damage = False
 
         # Загрузка текстур
         self.textures_dict = {
@@ -117,7 +530,7 @@ class Satyr(arcade.Sprite):
                 self.change_y = 10
             elif self.jump_frames <= 40:  # Следующие 20 обновлений (кадры 5-10)
                 # Падаем
-                self.change_y = -4
+                self.change_y = -8
             else:
                 # Завершаем прыжок, включаем обычную гравитацию
                 self.start_jump_complete = True
@@ -145,6 +558,7 @@ class Satyr(arcade.Sprite):
                     self.state = "run"
                     self.current_frame = 0
                     self.animation_speed_counter = 0
+                    self.can_damage = True
         else:
             self.on_ground = False
 
@@ -256,6 +670,7 @@ class CupHead(arcade.Sprite):
             "hit": {"right": [], "left": []},
             "death": {"right": [], "left": []},
             "ghost": {"right": [], "left": []},
+            "parry": {"right": [], "left": []},
         }
 
         for i in range(1, 6):
@@ -444,6 +859,15 @@ class CupHead(arcade.Sprite):
             flipped_texture = texture.flip_left_right()
             self.textures_dict["ghost"]["left"].append(flipped_texture)
 
+        for i in range(1, 9):
+            path = f"images/Parry/Hand/cuphead_parry_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            self.textures_dict["parry"]["right"].append(texture)
+
+        for texture in self.textures_dict["parry"]["right"]:
+            flipped_texture = texture.flip_left_right()
+            self.textures_dict["parry"]["left"].append(flipped_texture)
+
         self.state = "idle"
         self.direction = "right"
         self.current_frame = 0
@@ -501,6 +925,20 @@ class CupHead(arcade.Sprite):
 
         self.ghost = False
 
+        # Паррирование
+        self.parry = False
+        self.parry_timer = 0
+        self.parry_cooldown = 0
+        self.can_parry = True
+        self.parry_success = False
+        self.parry_success_timer = 0
+        self.ex_meter = 0  # Шкала супер-атаки
+        self.max_ex_meter = 5  # 5 паррирований = полная шкала
+        self.can_air_parry = False  # Можно ли парировать в воздухе
+        self.air_parry_window = 0  # Окно для паррирования в воздухе
+        self.in_air_parry_window = False  # В окне для воздушного паррирования
+        self.has_jumped = False  # Совершил ли прыжок
+
         self.animation_speeds = {
             "idle": 8,
             "run": 4,
@@ -523,6 +961,7 @@ class CupHead(arcade.Sprite):
             "hit": 5,
             "death": 5,
             "ghost": 5,
+            "parry": 6,
         }
 
     def update(self, delta_time):
@@ -557,6 +996,21 @@ class CupHead(arcade.Sprite):
                 else:
                     self.alpha = 255
 
+        # Обновление паррирования
+        if self.parry:
+            self.parry_timer -= 1
+            if self.parry_timer <= 0:
+                self.parry = False
+                self.can_parry = True
+
+        if self.parry_cooldown > 0:
+            self.parry_cooldown -= 1
+
+        if self.parry_success:
+            self.parry_success_timer -= 1
+            if self.parry_success_timer <= 0:
+                self.parry_success = False
+
         if self.key:
             self.center_x = self.center_x + (50 * (-1, 1)[self.direction == "right"])
             self.key = False
@@ -572,6 +1026,8 @@ class CupHead(arcade.Sprite):
             new_state = "flex"
         elif self.dashing_back:
             new_state = "dash_back"
+        elif self.parry:
+            new_state = 'parry'
         elif not self.on_ground and not self.dashing:
             # В прыжке оставляем обычную анимацию прыжка
             new_state = "jump"
@@ -758,18 +1214,18 @@ class CupHead(arcade.Sprite):
             self.hit_check = True
             textures_list = self.textures_dict["hit"][self.direction]
             if textures_list:
-                # Останавливаем движение при получении урона
+                # НЕ останавливаем движение при получении урона
+                self.can_move = True  # Можно двигаться во время анимации урона
 
                 if self.current_frame < len(textures_list) - 1:
                     self.current_frame += 1
                 else:
                     # Активируем временную неуязвимость после получения урона
                     self.invincible = True
-                    self.invincible_timer = 120  # 2 секунды при 60 FPS
-                    self.can_move = True
+                    self.invincible_timer = 90  # 1.5 секунды при 60 FPS
                     self.hit = False
                     self.hit_check = False
-                    self.just_took_damage = False  # Сбрасываем флаг
+                    self.just_took_damage = False
                 return
 
         if self.state == "ex_straight":
@@ -863,6 +1319,16 @@ class CupHead(arcade.Sprite):
             textures_list = self.textures_dict["run"][self.direction]
             if textures_list:
                 self.current_frame = (self.current_frame + 1) % len(textures_list)
+        elif self.state == "parry":
+            textures_list = self.textures_dict["parry"][self.direction]
+            if textures_list:
+                self.current_frame = (self.current_frame + 1) % len(textures_list)
+                if self.current_frame >= len(textures_list) - 1:
+                    if not self.on_ground:
+                        self.state = "jump"
+                    else:
+                        self.state = "idle"
+                    self.current_frame = 0
 
         elif self.state == "jump":
             textures_list = self.textures_dict["jump"][self.direction]
@@ -994,17 +1460,50 @@ class CupHead(arcade.Sprite):
         # Добавляем пулю в список для добавления
         self.bullets_to_add.append(bullet)
 
+    def process_parry(self, is_air_parry=False):
+        """Активация паррирования"""
+        if self.can_parry and self.parry_cooldown <= 0 and not self.hit:
+            # Проверяем условия для воздушного паррирования
+            if is_air_parry:
+                if not self.in_air_parry_window or self.on_ground:
+                    return False
+
+            self.parry = True
+            self.parry_timer = 15  # Продолжительность паррирования (15 кадров)
+            self.parry_cooldown = 30  # Кулдаун паррирования
+            self.can_parry = False
+            self.can_move = True  # Можно двигаться во время паррирования
+
+            # Специальный эффект для воздушного паррирования
+            if is_air_parry:
+                self.state = "parry"
+                self.current_frame = 0
+                self.animation_speed_counter = 0
+
+            return True
+        return False
+
+    def parry_successful(self):
+        """Успешное паррирование"""
+        self.parry_success = True
+        self.parry_success_timer = 30  # Показываем эффект 1 секунду
+        self.ex_meter += 1
+        if self.ex_meter >= self.max_ex_meter:
+            self.ex_meter = self.max_ex_meter
+            # Можно добавить визуальный эффект полной шкалы
+
+        self.change_y = 6  # Отскок вверх после паррирования
+
     def take_damage(self):
         """Получить урон"""
-        if not self.invincible and not self.just_took_damage:
+        if not self.invincible and not self.just_took_damage and not self.parry:
             self.hp -= 1
             self.hit = True
             self.just_took_damage = True
             self.invincible = True
-            self.invincible_timer = 120  # 2 секунды неуязвимости
+            self.invincible_timer = 90  # 1.5 секунды неуязвимости
 
-            # Останавливаем все действия при получении урона
-            self.shooting = False
+            # НЕ останавливаем стрельбу полностью, только сбрасываем флаги стрельбы
             self.shooting_straight = False
             self.shooting_up = False
             self.shooting_down = False
@@ -1013,12 +1512,12 @@ class CupHead(arcade.Sprite):
             self.shoot_diagonal_up_running_left = False
             self.duck_shooting = False
             self.shooting_diagonal_up = False
-            self.dashing = False
-            self.dashing_back = False
-            self.flexing = False
-            self.ex_straight = False
-            self.change_x = 0
-            self.moving = False
+
+            # НЕ останавливаем движение
+            # Можно продолжать стрельбу после получения урона
+            # если кнопка все еще зажата
+            if self.shooting:
+                self.shooting = True  # Сохраняем флаг стрельбы
 
 
 class GameWindow(arcade.Window):
@@ -1030,21 +1529,23 @@ class GameWindow(arcade.Window):
         self.all_sprites = arcade.SpriteList()
         self.enemies = arcade.SpriteList()
         self.bullets = arcade.SpriteList()
-        self.cuphead = CupHead("images/Idle/cuphead_idle_0001.png", 0.8, 2)
+        self.dragon_fireballs = arcade.SpriteList()  # Новый список для снарядов дракона
+
+        self.cuphead = CupHead("images/Idle/cuphead_idle_0001.png", 1, 2)
         self.cuphead.center_x = 50
         self.cuphead.center_y = 100
         self.cuphead.change_x = 0
         self.cuphead.change_y = 0
         self.cuphead.alpha = 255  # Инициализируем альфа-канал
-        self.satyr = Satyr(random.randint(50, 750), 100, -1)
         self.pull = cycle((15, 0, -15))
 
         self.victory = False
         self.loose = False
         self.hits = 0
+        self.timer_cpawn_satyr = 0
+        self.shoot = 0
 
         self.all_sprites.append(self.cuphead)
-        self.enemies.append(self.satyr)
 
     def on_draw(self):
         arcade.draw_texture_rect(
@@ -1057,6 +1558,21 @@ class GameWindow(arcade.Window):
         self.all_sprites.draw()
         self.enemies.draw()
         self.bullets.draw()
+        self.dragon_fireballs.draw()  # Рисуем снаряды дракона
+
+        # Отображаем HP
+        arcade.draw_text(f"HP: {self.cuphead.hp}", 10, SCREEN_HEIGHT - 30,
+                         arcade.color.RED, 24, bold=True)
+
+        # Отображаем шкалу супер-атаки
+
+        # Отображаем эффект паррирования
+        if self.cuphead.parry_success:
+            arcade.draw_text("PARRY!",
+                             self.cuphead.center_x - 40,
+                             self.cuphead.center_y + 80,
+                             arcade.color.YELLOW, 32, bold=True)
+
         if self.victory:
             self.pp.draw()
 
@@ -1064,10 +1580,23 @@ class GameWindow(arcade.Window):
         if self.loose or self.victory:
             return
 
+        self.timer_cpawn_satyr += 1
+        if self.timer_cpawn_satyr > 100:
+            choose = random.choice((BabyDragon,))
+            shoot_ = None
+            if choose == BabyDragon:
+                shoot_ = self.shoot % 2 == 1
+                self.shoot += 1
+
+            enemy = choose(random.randint(50, 1200), 100, random.choice((-1, 1)), shoot=shoot_)
+            self.enemies.append(enemy)
+            self.timer_cpawn_satyr = 0
+
         # Сначала обновляем спрайты
         self.all_sprites.update(delta_time)
         self.bullets.update(delta_time)
         self.enemies.update(delta_time)
+        self.dragon_fireballs.update(delta_time)  # Обновляем снаряды дракона
         self.cuphead.update(delta_time)
 
         # Если капхед умер, не обновляем остальную логику
@@ -1079,22 +1608,57 @@ class GameWindow(arcade.Window):
             self.bullets.append(bullet)
         self.cuphead.bullets_to_add.clear()  # Очищаем список после добавления
 
+        # Обрабатываем стрельбу драконов
+        for dragon in self.enemies:
+            if isinstance(dragon, BabyDragon):
+                fireball = dragon.shoot_at_player(self.cuphead)
+                if fireball:
+                    self.dragon_fireballs.append(fireball)
+
         # Проверка столкновений с врагами
         check_enemies = arcade.check_for_collision_with_list(self.cuphead, self.enemies)
-        if check_enemies:
-            # Вместо прямого уменьшения HP, вызываем метод take_damage
-            self.cuphead.take_damage()
+        for c in check_enemies:
+            if c.can_damage:
+                self.cuphead.take_damage()
 
-        # Применяем гравитацию только если не в дэше, не в flex и не в супер-атаке
+        # Проверка столкновений со снарядами дракона
+        check_fireballs = arcade.check_for_collision_with_list(
+            self.cuphead, self.dragon_fireballs
+        )
+        for fireball in check_fireballs:
+            if self.cuphead.parry and fireball.can_be_parried:
+                # Успешное паррирование розового снаряда
+                self.cuphead.parry_successful()
+                fireball.remove_from_sprite_lists()
+            elif not self.cuphead.invincible and not self.cuphead.parry:
+                self.cuphead.take_damage()
+                fireball.remove_from_sprite_lists()
+
+        # Применяем гравитацию ТОЛЬКО если не в состоянии урона и не в дэше
         if (
                 not self.cuphead.dashing
                 and self.cuphead.can_move
                 and not self.cuphead.dashing_back
-                and not self.cuphead.flexing  # Не применяем гравитацию во время flex
-                and not self.cuphead.ex_straight  # Не применяем гравитацию во время супер-атаки
-                and not self.cuphead.hit  # Не применяем гравитацию во время получения урона
+                and not self.cuphead.flexing
+                and not self.cuphead.ex_straight
+                and not self.cuphead.hit  # Исключаем гравитацию во время урона
+                and not self.cuphead.parry
+                and not self.cuphead.on_ground  # Гравитация только в воздухе
         ):
             self.cuphead.change_y -= 0.5
+
+        # ОБНОВЛЕНИЕ ОКНА ВОЗДУШНОГО ПАРРИРОВАНИЯ - ИСПРАВЛЕННЫЙ КОД
+        if self.cuphead.has_jumped and not self.cuphead.on_ground:
+            self.cuphead.air_parry_window += 1
+            if self.cuphead.air_parry_window <= 30:  # 30 кадров (0.5 секунды) окно
+                self.cuphead.in_air_parry_window = True
+            else:
+                self.cuphead.in_air_parry_window = False
+        else:
+            # Сброс при приземлении
+            self.cuphead.has_jumped = False
+            self.cuphead.in_air_parry_window = False
+            self.cuphead.air_parry_window = 0
 
         self.cuphead.center_y += self.cuphead.change_y
         self.cuphead.center_x += self.cuphead.change_x
@@ -1218,14 +1782,30 @@ class GameWindow(arcade.Window):
             self.cuphead.shoot_diagonal_up_running = False
             self.cuphead.shoot_diagonal_up_running_left = False
 
-        # Проверка столкновений пуль с сатиром
+        # Проверка столкновений пуль с врагами
         for enemy in self.enemies:
             hit_list = arcade.check_for_collision_with_list(enemy, self.bullets)
             for bullet in hit_list:
-                if bullet in self.bullets:  # Проверяем, что пуля еще существует
-                    bullet.remove_from_sprite_lists()
-                if enemy in self.enemies:  # Проверяем, что враг еще существует
+                if (
+                        enemy in self.enemies and enemy.can_damage
+                ):  # Проверяем, что враг еще существует
                     enemy.take_damage(bullet.damage)  # Наносим урон через метод
+                    if bullet in self.bullets:  # Проверяем, что пуля еще существует
+                        bullet.remove_from_sprite_lists()
+
+        # Проверка столкновений пуль с снарядами дракона (паррирование)
+        for bullet in self.bullets:
+            hit_fireballs = arcade.check_for_collision_with_list(bullet, self.dragon_fireballs)
+            for fireball in hit_fireballs:
+                if fireball.is_pink and fireball.can_be_parried:
+                    # Успешное паррирование розового снаряда
+                    self.cuphead.parry_successful()
+                    bullet.remove_from_sprite_lists()
+                    fireball.remove_from_sprite_lists()
+                elif not fireball.is_pink:
+                    # Обычный снаряд уничтожается пулей
+                    bullet.remove_from_sprite_lists()
+                    fireball.remove_from_sprite_lists()
 
     def on_key_press(self, key, modifiers):
         # Если капхед умер или отключен ввод, игнорируем нажатия
@@ -1251,6 +1831,7 @@ class GameWindow(arcade.Window):
                     and not self.cuphead.duck
                     and not self.cuphead.flexing
                     and not self.cuphead.ex_straight
+                    and not self.cuphead.parry  # Можно двигаться во время паррирования
             ):
                 self.cuphead.change_x = -SPEED
                 self.cuphead.moving = True
@@ -1268,6 +1849,7 @@ class GameWindow(arcade.Window):
                     and not self.cuphead.duck
                     and not self.cuphead.flexing
                     and not self.cuphead.ex_straight
+                    and not self.cuphead.parry  # Можно двигаться во время паррирования
             ):
                 self.cuphead.change_x = SPEED
                 self.cuphead.moving = True
@@ -1299,12 +1881,28 @@ class GameWindow(arcade.Window):
 
         elif (
                 key == arcade.key.SPACE
-                and self.cuphead.on_ground
                 and not self.cuphead.flexing
                 and not self.cuphead.ex_straight
+                and not self.cuphead.hit
         ):
-            self.cuphead.change_y = 10
-            self.cuphead.on_ground = False
+            # Первое нажатие - обычный прыжок
+            if self.cuphead.on_ground:
+                self.cuphead.change_y = 10
+                self.cuphead.on_ground = False
+                self.cuphead.has_jumped = True
+                self.cuphead.in_air_parry_window = True
+
+            # Второе нажатие в окне - воздушное паррирование
+            elif (self.cuphead.has_jumped and
+                  self.cuphead.in_air_parry_window and
+                  not self.cuphead.on_ground):
+
+                # Активируем воздушное паррирование
+                if self.cuphead.process_parry(is_air_parry=True):
+                    # Успешно активировали паррирование
+                    # НЕ даем дополнительный толчок!
+                    self.cuphead.has_jumped = False  # Сбрасываем для следующего прыжка
+                    self.cuphead.in_air_parry_window = False
 
         # ДЭШ
         if (
@@ -1313,6 +1911,7 @@ class GameWindow(arcade.Window):
                 and not self.cuphead.dashing_back
                 and not self.cuphead.flexing
                 and not self.cuphead.ex_straight
+                and not self.cuphead.parry  # Нельзя делать дэш во время паррирования
         ):
             if self.cuphead.count_dash:
                 self.cuphead.start_dash()
@@ -1325,6 +1924,7 @@ class GameWindow(arcade.Window):
                 and not self.cuphead.flexing
                 and not self.cuphead.ex_straight
                 and self.cuphead.on_ground
+                and not self.cuphead.parry  # Нельзя flex во время паррирования
         ):
             self.cuphead.flexing = True
             self.cuphead.change_x = 0
@@ -1347,8 +1947,11 @@ class GameWindow(arcade.Window):
                 key == arcade.key.V
                 and not self.cuphead.ex_straight
                 and not self.cuphead.flexing
+                and self.cuphead.ex_meter >= self.cuphead.max_ex_meter  # Только при полной шкале
+                and not self.cuphead.parry  # Нельзя использовать супер во время паррирования
         ):
             self.cuphead.ex_straight = True
+            self.cuphead.ex_meter = 0  # Сбрасываем шкалу
             self.cuphead.change_x = 0
             self.cuphead.change_y = 0  # Сбрасываем вертикальную скорость
             self.cuphead.moving = False
@@ -1368,6 +1971,7 @@ class GameWindow(arcade.Window):
                 key == arcade.key.Z
                 and not self.cuphead.flexing
                 and not self.cuphead.ex_straight
+                and not self.cuphead.parry  # Можно стрелять во время паррирования
         ):
             self.cuphead.shooting = True
             # При начале стрельбы устанавливаем состояние по умолчанию
@@ -1399,6 +2003,7 @@ class GameWindow(arcade.Window):
                     not self.cuphead.keys_pressed["right"]
                     and not self.cuphead.dashing
                     and not self.cuphead.dashing_back
+                    and not self.cuphead.parry  # Учитываем паррирование
             ):
                 self.cuphead.change_x = 0
                 self.cuphead.moving = False
@@ -1410,6 +2015,7 @@ class GameWindow(arcade.Window):
                     not self.cuphead.keys_pressed["left"]
                     and not self.cuphead.dashing
                     and not self.cuphead.dashing_back
+                    and not self.cuphead.parry  # Учитываем паррирование
             ):
                 self.cuphead.change_x = 0
                 self.cuphead.moving = False
@@ -1436,6 +2042,7 @@ class GameWindow(arcade.Window):
                     and not self.cuphead.dashing_back
                     and not self.cuphead.flexing
                     and not self.cuphead.ex_straight
+                    and not self.cuphead.parry  # Учитываем паррирование
             ):
                 any_key_pressed = (
                         self.cuphead.keys_pressed["left"]
@@ -1460,6 +2067,7 @@ class GameWindow(arcade.Window):
                 and not self.cuphead.duck
                 and not self.cuphead.flexing
                 and not self.cuphead.ex_straight
+                and not self.cuphead.parry  # Учитываем паррирование
         ):
             if key == arcade.key.LEFT and self.cuphead.change_x < 0:
                 if self.cuphead.keys_pressed["right"]:
@@ -1504,6 +2112,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
