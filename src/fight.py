@@ -34,7 +34,9 @@ class DragonFire(arcade.Sprite):
 
         textures_list = []
         for i in range(1, 21):
-            texture = arcade.load_texture(f"images/Baby Dragon/{text}{'0' * (4 - len(str(i)))}{i}.png")
+            texture = arcade.load_texture(
+                f"images/Baby Dragon/{text}{'0' * (4 - len(str(i)))}{i}.png"
+            )
             textures_list.append(texture)
 
         # Кешируем загруженные текстуры
@@ -54,7 +56,7 @@ class DragonFire(arcade.Sprite):
         super().__init__(self.textures_list[0], scale=scale)
         self.center_x = x
         self.center_y = y
-        self.lifetime = 180
+        self.lifetime = 480
 
         # Вычисляем направление к цели (игроку)
         dx = target_x - x
@@ -65,10 +67,8 @@ class DragonFire(arcade.Sprite):
             self.change_x = (dx / distance) * DRAGON_FIRE_SPEED
             self.change_y = (dy / distance) * DRAGON_FIRE_SPEED
 
-            # Вычисляем угол поворота для спрайта
             self.angle = math.degrees(math.atan2(dy, dx))
 
-            # Поворачиваем текстуру
             if self.angle < -90 or self.angle > 90:
                 self.texture = self.texture.flip_left_right()
         else:
@@ -81,6 +81,7 @@ class DragonFire(arcade.Sprite):
         self.can_be_parried = is_pink  # Только розовые снаряды можно парировать
         self.current_frame = 0
         self.counter = 0
+        self.knockable = True  # По умолчанию пули отскакивают
 
     def update(self, delta_time):
         self.counter += 1
@@ -88,15 +89,21 @@ class DragonFire(arcade.Sprite):
             self.current_frame = (self.current_frame + 1) % len(self.textures_list)
             self.counter = 0
 
-        # Получаем текстуру из кешированного списка
         self.texture = self.textures_list[self.current_frame]
 
-        # Применяем отражение если нужно
         if self.angle < -90 or self.angle > 90:
             self.texture = self.texture.flip_left_right()
 
         self.center_x += self.change_x
         self.center_y += self.change_y
+
+        # Только отскакивающие пули меняют направление
+        if self.knockable:
+            if self.top >= SCREEN_HEIGHT or self.bottom <= 0:
+                self.change_y *= -1
+            if self.right >= SCREEN_WIDTH or self.left <= 0:
+                self.change_x *= -1
+
         self.lifetime -= 1
         if self.lifetime <= 0:
             self.remove_from_sprite_lists()
@@ -112,55 +119,91 @@ class DragonFire(arcade.Sprite):
 
 
 class BabyDragon(arcade.Sprite):
-    # Кеширование текстур для оптимизации
-    _texture_cache_idle = None
-    _texture_cache_fly_up = None
-    _texture_cache_attack = None
+    _texture_cache = None
 
     @classmethod
     def _load_textures(cls):
         """Загружаем текстуры один раз и кешируем их"""
-        if (cls._texture_cache_idle is not None and
-                cls._texture_cache_fly_up is not None and
-                cls._texture_cache_attack is not None):
+        if cls._texture_cache is not None:
             return
 
-        idle_textures = []
-        fly_up_textures = []
-        attack_textures = []
+        cls._texture_cache = {
+            "down": {"idle": [], "fly_up": [], "attack": []},
+            "left": {"idle": [], "fly_up": [], "attack": []},
+            "right": {"idle": [], "fly_up": [], "attack": []},
+        }
 
+        # Загрузка текстур для DOWN
         for i in range(1, 20):
             path = f"images/Baby Dragon/Down/Idle/lv3-2_baby_dragon_idle_{'0' * (4 - len(str(i)))}{i}.png"
             texture = arcade.load_texture(path)
-            idle_textures.append(texture)
+            cls._texture_cache["down"]["idle"].append(texture)
 
         for i in range(1, 6):
             path = f"images/Baby Dragon/Down/Fly up/lv3-2_baby_dragon_fly_up_{'0' * (4 - len(str(i)))}{i}.png"
             texture = arcade.load_texture(path)
-            fly_up_textures.append(texture)
+            cls._texture_cache["down"]["fly_up"].append(texture)
 
         for i in range(1, 28):
             path = f"images/Baby Dragon/Down/Attack/lv3-2_baby_dragon_attack_{'0' * (4 - len(str(i)))}{i}.png"
             texture = arcade.load_texture(path)
-            attack_textures.append(texture)
+            cls._texture_cache["down"]["attack"].append(texture)
 
-        cls._texture_cache_idle = idle_textures
-        cls._texture_cache_fly_up = fly_up_textures
-        cls._texture_cache_attack = attack_textures
+        # Загрузка текстур для LEFT
+        for i in range(1, 11):
+            path = f"images/Baby Dragon/Left - Right/Idle/lv3-2_baby_dragon_3Q_idle_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            cls._texture_cache["left"]["idle"].append(texture)
 
-    def __init__(self, x, y, direction_x, shoot):
-        # Загружаем текстуры в кеш если еще не загружены
+        for i in range(1, 6):
+            path = f"images/Baby Dragon/Left - Right/Fly up/lv3-2_baby_dragon_3Q_fly_up_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            cls._texture_cache["left"]["fly_up"].append(texture)
+
+        for i in range(1, 23):
+            path = f"images/Baby Dragon/Left - Right/Attack/lv3-2_baby_dragon_3Q_attack_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            cls._texture_cache["left"]["attack"].append(texture)
+
+        # Загрузка текстур для RIGHT
+        for i in range(1, 11):
+            path = f"images/Baby Dragon/Left - Right/Idle/lv3-2_baby_dragon_3Q_idle_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            texture = texture.flip_left_right()
+            cls._texture_cache["right"]["idle"].append(texture)
+
+        for i in range(1, 6):
+            path = f"images/Baby Dragon/Left - Right/Fly up/lv3-2_baby_dragon_3Q_fly_up_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            texture = texture.flip_left_right()
+            cls._texture_cache["right"]["fly_up"].append(texture)
+
+        for i in range(1, 23):
+            path = f"images/Baby Dragon/Left - Right/Attack/lv3-2_baby_dragon_3Q_attack_{'0' * (4 - len(str(i)))}{i}.png"
+            texture = arcade.load_texture(path)
+            texture = texture.flip_left_right()
+            cls._texture_cache["right"]["attack"].append(texture)
+
+    def __init__(self, x, y, direction_x, dragon_type=0, position_type="down"):
         BabyDragon._load_textures()
+        super().__init__(BabyDragon._texture_cache[position_type]["idle"][0])
 
-        # Используем первую текстуру из кеша
-        super().__init__(BabyDragon._texture_cache_idle[0])
+        self.dragon_type = dragon_type
+        self.position_type = position_type
 
-        self.center_x = x
+        if position_type == "left":
+            self.center_x = 100
+            self.direction = "right"
+        elif position_type == "right":
+            self.center_x = SCREEN_WIDTH - 100
+            self.direction = "left"
+        else:
+            self.center_x = x
+
         self.center_y = SCREEN_HEIGHT + 100
         self.change_x = 0
         self.change_y = -3
 
-        self.direction = "left"
         self.state = "idle"
         self.current_frame = 0
         self.animation_speed_counter = 0
@@ -170,15 +213,106 @@ class BabyDragon(arcade.Sprite):
         self.invincible_timer = 0
         self.can_damage = False
         self.is_dead = False
-        self.target_y = 600
+        self.target_y = 600 if position_type == "down" else 400
         self.attack_done = False
         self.disappear = False
+
+        # Для управления анимацией стрельбы
+        self.is_shooting = False
+        self.shoot_counter = 0  # Сколько выстрелов осталось сделать
+        self.current_shoot_frame = 0
+        self.shoot_animation_delay = 0
+        self.shoot_animation_forward = True
+
+        # Для хранения игрока для выстрела
+        self.target_player = None
+        # Для хранения созданных снарядов
+        self.fireballs_to_add = []
 
         # Таймер для стрельбы
         self.shoot_timer = 0
         self.shoot_cooldown = 60
         self.can_shoot = False
-        self.is_pink = shoot
+
+        # Количество выстрелов за одну атаку
+        self.max_shots = 3 if dragon_type == 2 else 1
+
+        # Для тройного выстрела
+        self.shoot_pattern = cycle((True, False))
+
+    def shoot_at_player(self, player):
+        """Стреляет в игрока, если можно"""
+        if not self.can_shoot or self.shoot_timer < self.shoot_cooldown:
+            return []
+
+        # Сохраняем цель для выстрелов
+        self.target_player = player
+
+        # Устанавливаем количество выстрелов
+        self.shoot_counter = self.max_shots
+
+        # Запускаем анимацию стрельбы
+        self.is_shooting = True
+        self.current_shoot_frame = 0
+        self.shoot_animation_delay = 0
+        self.shoot_animation_forward = True
+        self.fireballs_to_add.clear()  # Очищаем список снарядов
+
+        # Сбрасываем таймер
+        self.shoot_timer = 0
+
+        return []
+
+    def create_shoot_projectile(self):
+        """Создает снаряд при выстреле в зависимости от типа дракона"""
+        if not self.target_player:
+            return []
+
+        fireballs = []
+
+        if self.dragon_type == 0:
+            # Обычный дракон
+            fireball = DragonFire(
+                self.center_x, self.center_y,
+                self.target_player.center_x, self.target_player.center_y, False
+            )
+            fireball.knockable = True
+            fireballs.append(fireball)
+
+        elif self.dragon_type == 1:
+            # Дракон с розовыми снарядами
+            fireball = DragonFire(
+                self.center_x, self.center_y,
+                self.target_player.center_x, self.target_player.center_y, True
+            )
+            fireball.knockable = True
+            fireballs.append(fireball)
+
+        elif self.dragon_type == 2:
+            # Дракон с тремя снарядами
+            is_pink = next(self.shoot_pattern)
+
+            for angle_offset in [-15, 0, 15]:
+                dx = self.target_player.center_x - self.center_x
+                dy = self.target_player.center_y - self.center_y
+                distance = math.sqrt(dx ** 2 + dy ** 2)
+                base_angle = math.atan2(dy, dx)
+
+                angle = base_angle + math.radians(angle_offset)
+                target_x = self.center_x + distance * math.cos(angle)
+                target_y = self.center_y + distance * math.sin(angle)
+
+                fireball = DragonFire(
+                    self.center_x,
+                    self.center_y,
+                    target_x,
+                    target_y,
+                    is_pink if angle_offset == 0 else False,
+                )
+                fireball.knockable = False
+                fireballs.append(fireball)
+
+        return fireballs
 
     def update(self, delta_time):
         """Обновление состояния BabyDragon"""
@@ -187,19 +321,22 @@ class BabyDragon(arcade.Sprite):
 
         super().update()
 
-        # Обновление анимации
+        # Если идет анимация стрельбы, обрабатываем ее отдельно
+        if self.is_shooting:
+            self.update_shoot_animation()
+            # Возвращаемся чтобы не обновлять обычную анимацию
+            return
+
         self.animation_speed_counter += 1
         if self.animation_speed_counter >= self.animation_speed:
             self.animation_speed_counter = 0
             self.update_animation()
             self.update_texture()
 
-        # Обновление позиции
         self.center_x += self.change_x
         self.center_y += self.change_y
 
         if self.state == "idle":
-            # Плавно спускаемся к целевой высоте
             if self.center_y <= self.target_y:
                 self.state = "attack"
                 self.change_y = 0
@@ -209,12 +346,9 @@ class BabyDragon(arcade.Sprite):
                 self.can_shoot = True
 
         elif self.state == "attack":
-            # Атака проигрывается один раз
             if not self.attack_done:
-                # Проверяем, завершилась ли анимация атаки
-                if self.current_frame >= len(BabyDragon._texture_cache_attack) - 1:
+                if self.current_frame >= len(self._get_current_textures("attack")) - 1:
                     self.attack_done = True
-                    # После атаки начинаем подъем
                     self.state = "fly_up"
                     self.current_frame = 0
                     self.animation_speed_counter = 0
@@ -223,53 +357,189 @@ class BabyDragon(arcade.Sprite):
                     self.can_shoot = False
 
         elif self.state == "fly_up":
-            # Поднимаемся вверх
             if self.center_y > SCREEN_HEIGHT + 100:
                 self.disappear = True
                 self.remove_from_sprite_lists()
 
-        # Обновление таймера стрельбы
         if self.can_shoot:
             self.shoot_timer += 1
 
-    def shoot_at_player(self, player):
-        """Стреляет в игрока, если можно"""
-        if not self.can_shoot or self.shoot_timer < self.shoot_cooldown:
-            return None
+    def update_shoot_animation(self):
+        """Обновление анимации стрельбы - вперед и назад"""
+        self.shoot_animation_delay += 1
 
-        # Создаем снаряд, который летит в игрока
-        fireball = DragonFire(
-            self.center_x, self.center_y, player.center_x, player.center_y, self.is_pink
-        )
+        # Задержка между кадрами анимации стрельбы
+        if self.shoot_animation_delay >= 3:
+            self.shoot_animation_delay = 0
 
-        # Сбрасываем таймер
-        self.shoot_timer = 0
+            # Получаем текстуры атаки
+            attack_textures = self._get_current_textures("attack")
+            total_frames = len(attack_textures)
 
-        return fireball
+            # Логика для анимации DOWN дракона (фреймы 1-27)
+            if self.position_type == "down":
+                # Если счетчик выстрелов > 0
+                if self.shoot_counter > 0:
+                    # Движемся вперед
+                    if self.shoot_animation_forward:
+                        self.current_shoot_frame += 1
+
+                        # Проверяем, достигли ли 24 кадра (индекс 23, т.к. с 0)
+                        if self.current_shoot_frame == 23:
+                            # Производим выстрел, если счетчик > 0
+                            if self.shoot_counter > 0:
+                                fireballs = self.create_shoot_projectile()
+                                if fireballs:
+                                    self.fireballs_to_add.extend(fireballs)
+                                self.shoot_counter -= 1
+
+                            # Если счетчик равен 0, продолжаем до конца
+                            if self.shoot_counter <= 0:
+                                # Продолжаем до 27 кадра (индекс 26)
+                                if self.current_shoot_frame < 26:
+                                    # Обновляем текстуру
+                                    if 0 <= self.current_shoot_frame < total_frames:
+                                        self.texture = attack_textures[self.current_shoot_frame]
+                                    return
+                                # Если уже на 26 кадре, завершаем анимацию
+                                else:
+                                    self.complete_shoot_animation()
+                                    return
+                            else:
+                                # Меняем направление на обратное
+                                self.shoot_animation_forward = False
+
+                        # Проверяем достижение 17 кадра (индекс 16) для первого выстрела
+                        elif self.current_shoot_frame == 16 and self.shoot_counter == self.max_shots:
+                            # Производим выстрел
+                            fireballs = self.create_shoot_projectile()
+                            if fireballs:
+                                self.fireballs_to_add.extend(fireballs)
+                            self.shoot_counter -= 1
+
+                    # Движемся назад
+                    else:
+                        self.current_shoot_frame -= 1
+
+                        # Проверяем, достигли ли 17 кадра (индекс 16) для выстрела
+                        if self.current_shoot_frame == 16:
+                            # Производим выстрел, если счетчик > 0
+                            if self.shoot_counter > 0:
+                                fireballs = self.create_shoot_projectile()
+                                if fireballs:
+                                    self.fireballs_to_add.extend(fireballs)
+                                self.shoot_counter -= 1
+
+                            # Если счетчик равен 0, меняем направление на вперед
+                            if self.shoot_counter <= 0:
+                                self.shoot_animation_forward = True
+
+                        # Если дошли до 16 кадра (индекс 15), снова меняем направление
+                        elif self.current_shoot_frame <= 15:
+                            self.current_shoot_frame = 15
+                            self.shoot_animation_forward = True
+
+                # Если счетчик выстрелов <= 0
+                else:
+                    # Просто продолжаем до конца анимации
+                    if self.current_shoot_frame < 26:
+                        self.current_shoot_frame += 1
+                    else:
+                        # Завершаем анимацию
+                        self.complete_shoot_animation()
+                        return
+
+            # Логика для анимации LEFT/RIGHT дракона (фреймы 1-22)
+            else:
+                if self.shoot_counter > 0:
+                    if self.shoot_animation_forward:
+                        self.current_shoot_frame += 1
+
+                        # Выстрел на 15 кадре (индекс 14)
+                        if self.current_shoot_frame == 14 and self.shoot_counter > 0:
+                            fireballs = self.create_shoot_projectile()
+                            if fireballs:
+                                self.fireballs_to_add.extend(fireballs)
+                            self.shoot_counter -= 1
+
+                        # Если дошли до 19 кадра (индекс 18)
+                        elif self.current_shoot_frame == 18:
+                            if self.shoot_counter <= 0:
+                                # Продолжаем до конца
+                                if self.current_shoot_frame < 21:
+                                    # Обновляем текстуру
+                                    if 0 <= self.current_shoot_frame < total_frames:
+                                        self.texture = attack_textures[self.current_shoot_frame]
+                                    return
+                                else:
+                                    self.complete_shoot_animation()
+                                    return
+                            else:
+                                # Меняем направление
+                                self.shoot_animation_forward = False
+
+                    else:
+                        self.current_shoot_frame -= 1
+
+                        # Если дошли до 10 кадра (индекс 9)
+                        if self.current_shoot_frame == 9:
+                            if self.shoot_counter <= 0:
+                                self.shoot_animation_forward = True
+                else:
+                    # Завершаем анимацию
+                    if self.current_shoot_frame < 21:
+                        self.current_shoot_frame += 1
+                    else:
+                        self.complete_shoot_animation()
+                        return
+
+            # Проверяем границы кадров
+            if self.current_shoot_frame < 0:
+                self.current_shoot_frame = 0
+            elif self.current_shoot_frame >= total_frames:
+                self.current_shoot_frame = total_frames - 1
+
+            # Обновляем текстуру
+            if 0 <= self.current_shoot_frame < total_frames:
+                self.texture = attack_textures[self.current_shoot_frame]
+
+    def complete_shoot_animation(self):
+        """Завершение анимации стрельбы"""
+        self.is_shooting = False
+        self.state = "fly_up"
+        self.attack_done = False
+        self.current_frame = 0
+        self.shoot_counter = 0
+        self.target_player = None
+        self.animation_speed_counter = 0
+
+    def _get_current_textures(self, state):
+        """Получить текущий список текстур в зависимости от состояния и позиции"""
+        return BabyDragon._texture_cache[self.position_type][state]
 
     def update_animation(self):
         """Обновление анимации"""
         if self.state == "idle":
-            self.current_frame = (self.current_frame + 1) % len(BabyDragon._texture_cache_idle)
+            textures = self._get_current_textures("idle")
+            if textures:
+                self.current_frame = (self.current_frame + 1) % len(textures)
 
         elif self.state == "attack":
             if not self.attack_done:
-                if self.current_frame < len(BabyDragon._texture_cache_attack) - 1:
+                textures = self._get_current_textures("attack")
+                if textures and self.current_frame < len(textures) - 1:
                     self.current_frame += 1
 
         elif self.state == "fly_up":
-            self.current_frame = (self.current_frame + 1) % len(BabyDragon._texture_cache_fly_up)
+            textures = self._get_current_textures("fly_up")
+            if textures:
+                self.current_frame = (self.current_frame + 1) % len(textures)
 
     def update_texture(self):
         """Обновление текущей текстуры спрайта"""
-        if self.state == "idle":
-            self.texture = BabyDragon._texture_cache_idle[self.current_frame]
-
-        elif self.state == "attack":
-            self.texture = BabyDragon._texture_cache_attack[self.current_frame]
-
-        elif self.state == "fly_up":
-            self.texture = BabyDragon._texture_cache_fly_up[self.current_frame]
+        textures = self._get_current_textures(self.state)
+        if textures and 0 <= self.current_frame < len(textures):
+            self.texture = textures[self.current_frame]
 
     def take_damage(self, damage):
         """Принять урон"""
@@ -1027,7 +1297,7 @@ class CupHead(arcade.Sprite):
         elif self.dashing_back:
             new_state = "dash_back"
         elif self.parry:
-            new_state = 'parry'
+            new_state = "parry"
         elif not self.on_ground and not self.dashing:
             # В прыжке оставляем обычную анимацию прыжка
             new_state = "jump"
@@ -1433,6 +1703,7 @@ class CupHead(arcade.Sprite):
         direction_x = 1 if self.direction == "right" else -1
         direction_y = 0
         bullet_angle = 0
+        print('s')
 
         # Позиция выстрела
         flag = self.direction == "right"
@@ -1465,22 +1736,23 @@ class CupHead(arcade.Sprite):
         if self.can_parry and self.parry_cooldown <= 0 and not self.hit:
             # Проверяем условия для воздушного паррирования
             if is_air_parry:
-                if not self.in_air_parry_window or self.on_ground:
-                    return False
+                # Только если в воздухе и в окне паррирования
+                if (
+                        not self.on_ground
+                        and self.has_jumped
+                        and self.air_parry_window <= 30
+                ):
+                    self.parry = True
+                    self.parry_timer = 15
+                    self.parry_cooldown = 30
+                    self.can_parry = False
+                    self.can_move = True
+                    self.state = "parry"
+                    self.current_frame = 0
+                    self.animation_speed_counter = 0
+                    return True
+                return False
 
-            self.parry = True
-            self.parry_timer = 15  # Продолжительность паррирования (15 кадров)
-            self.parry_cooldown = 30  # Кулдаун паррирования
-            self.can_parry = False
-            self.can_move = True  # Можно двигаться во время паррирования
-
-            # Специальный эффект для воздушного паррирования
-            if is_air_parry:
-                self.state = "parry"
-                self.current_frame = 0
-                self.animation_speed_counter = 0
-
-            return True
         return False
 
     def parry_successful(self):
@@ -1561,17 +1833,27 @@ class GameWindow(arcade.Window):
         self.dragon_fireballs.draw()  # Рисуем снаряды дракона
 
         # Отображаем HP
-        arcade.draw_text(f"HP: {self.cuphead.hp}", 10, SCREEN_HEIGHT - 30,
-                         arcade.color.RED, 24, bold=True)
+        arcade.draw_text(
+            f"HP: {self.cuphead.hp}",
+            10,
+            SCREEN_HEIGHT - 30,
+            arcade.color.RED,
+            24,
+            bold=True,
+        )
 
         # Отображаем шкалу супер-атаки
 
         # Отображаем эффект паррирования
         if self.cuphead.parry_success:
-            arcade.draw_text("PARRY!",
-                             self.cuphead.center_x - 40,
-                             self.cuphead.center_y + 80,
-                             arcade.color.YELLOW, 32, bold=True)
+            arcade.draw_text(
+                "PARRY!",
+                self.cuphead.center_x - 40,
+                self.cuphead.center_y + 80,
+                arcade.color.YELLOW,
+                32,
+                bold=True,
+            )
 
         if self.victory:
             self.pp.draw()
@@ -1583,12 +1865,26 @@ class GameWindow(arcade.Window):
         self.timer_cpawn_satyr += 1
         if self.timer_cpawn_satyr > 100:
             choose = random.choice((BabyDragon,))
-            shoot_ = None
             if choose == BabyDragon:
-                shoot_ = self.shoot % 2 == 1
-                self.shoot += 1
+                dragon_type = random.randint(0, 2)
+                position_type = random.choice(["down", "left", "right"])
 
-            enemy = choose(random.randint(50, 1200), 100, random.choice((-1, 1)), shoot=shoot_)
+                # Определяем координаты в зависимости от позиции
+                if position_type == "down":
+                    x = random.randint(300, SCREEN_WIDTH - 300)  # Центр экрана
+                elif position_type == "left":
+                    x = 150  # Левая часть
+                else:  # "right"
+                    x = SCREEN_WIDTH - 150  # Правая часть
+
+                enemy = BabyDragon(
+                    x, 100, random.choice((-1, 1)), dragon_type, position_type
+                )
+            else:
+                enemy = choose(
+                    random.randint(50, 1200), 100, random.choice((-1, 1)), shoot=None
+                )
+
             self.enemies.append(enemy)
             self.timer_cpawn_satyr = 0
 
@@ -1611,9 +1907,10 @@ class GameWindow(arcade.Window):
         # Обрабатываем стрельбу драконов
         for dragon in self.enemies:
             if isinstance(dragon, BabyDragon):
-                fireball = dragon.shoot_at_player(self.cuphead)
-                if fireball:
-                    self.dragon_fireballs.append(fireball)
+                fireballs = dragon.shoot_at_player(self.cuphead)
+                if fireballs:
+                    for fireball in fireballs:
+                        self.dragon_fireballs.append(fireball)
 
         # Проверка столкновений с врагами
         check_enemies = arcade.check_for_collision_with_list(self.cuphead, self.enemies)
@@ -1793,20 +2090,6 @@ class GameWindow(arcade.Window):
                     if bullet in self.bullets:  # Проверяем, что пуля еще существует
                         bullet.remove_from_sprite_lists()
 
-        # Проверка столкновений пуль с снарядами дракона (паррирование)
-        for bullet in self.bullets:
-            hit_fireballs = arcade.check_for_collision_with_list(bullet, self.dragon_fireballs)
-            for fireball in hit_fireballs:
-                if fireball.is_pink and fireball.can_be_parried:
-                    # Успешное паррирование розового снаряда
-                    self.cuphead.parry_successful()
-                    bullet.remove_from_sprite_lists()
-                    fireball.remove_from_sprite_lists()
-                elif not fireball.is_pink:
-                    # Обычный снаряд уничтожается пулей
-                    bullet.remove_from_sprite_lists()
-                    fireball.remove_from_sprite_lists()
-
     def on_key_press(self, key, modifiers):
         # Если капхед умер или отключен ввод, игнорируем нажатия
         if self.cuphead.death or self.cuphead.disable_input:
@@ -1890,21 +2173,13 @@ class GameWindow(arcade.Window):
                 self.cuphead.change_y = 10
                 self.cuphead.on_ground = False
                 self.cuphead.has_jumped = True
-                self.cuphead.in_air_parry_window = True
-
+                self.cuphead.air_parry_window = 0  # Сбрасываем окно
             # Второе нажатие в окне - воздушное паррирование
-            elif (self.cuphead.has_jumped and
-                  self.cuphead.in_air_parry_window and
-                  not self.cuphead.on_ground):
-
+            elif not self.cuphead.on_ground and self.cuphead.has_jumped:
                 # Активируем воздушное паррирование
-                if self.cuphead.process_parry(is_air_parry=True):
-                    # Успешно активировали паррирование
-                    # НЕ даем дополнительный толчок!
-                    self.cuphead.has_jumped = False  # Сбрасываем для следующего прыжка
-                    self.cuphead.in_air_parry_window = False
+                self.cuphead.process_parry(is_air_parry=True)
 
-        # ДЭШ
+                # ДЭШ
         if (
                 key == arcade.key.X
                 and not self.cuphead.dashing
@@ -1947,7 +2222,6 @@ class GameWindow(arcade.Window):
                 key == arcade.key.V
                 and not self.cuphead.ex_straight
                 and not self.cuphead.flexing
-                and self.cuphead.ex_meter >= self.cuphead.max_ex_meter  # Только при полной шкале
                 and not self.cuphead.parry  # Нельзя использовать супер во время паррирования
         ):
             self.cuphead.ex_straight = True
