@@ -147,13 +147,11 @@ class RockLion(arcade.Sprite):
     def update(self, delta_time):
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
-            # Чередование: белая вспышка / нормальный вид
-            if self.hit_flash_timer % 2 == 1:
-                self.color = (200, 200, 255)  # холодная белая вспышка
+            if self.hit_flash_timer > 2:
+                self.alpha = 60
             else:
-                self.color = (255, 255, 255)
+                self.alpha = 255
             if self.hit_flash_timer <= 0:
-                self.color = (255, 255, 255)
                 self.alpha = 255
 
         if self.is_dead:
@@ -290,7 +288,7 @@ class DragonFire(arcade.Sprite):
         return textures_list
 
     def __init__(self, x, y, target_x, target_y, is_pink=False):
-        scale = 1
+        scale = 1.5
         self.textures_list = DragonFire._load_textures(is_pink)
         super().__init__(self.textures_list[0], scale=scale)
         self.center_x = x
@@ -388,10 +386,10 @@ class BabyDragon(arcade.Sprite):
         self.position_type = position_type
 
         if position_type == "left":
-            self.center_x = 100
+            self.center_x = int(SCREEN_WIDTH * 0.06)
             self.direction = "right"
         elif position_type == "right":
-            self.center_x = SCREEN_WIDTH - 100
+            self.center_x = int(SCREEN_WIDTH * 0.94)
             self.direction = "left"
         else:
             self.center_x = x
@@ -409,7 +407,7 @@ class BabyDragon(arcade.Sprite):
         self.invincible_timer = 0
         self.can_damage = False
         self.is_dead = False
-        self.target_y = 600 if position_type == "down" else 400
+        self.target_y = int(SCREEN_HEIGHT * 0.67) if position_type == "down" else int(SCREEN_HEIGHT * 0.44)
         self.attack_done = False
         self.disappear = False
 
@@ -500,13 +498,11 @@ class BabyDragon(arcade.Sprite):
 
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
-            # Чередование: белая вспышка / нормальный вид
-            if self.hit_flash_timer % 2 == 1:
-                self.color = (200, 200, 255)  # холодная белая вспышка
+            if self.hit_flash_timer > 2:
+                self.alpha = 60
             else:
-                self.color = (255, 255, 255)
+                self.alpha = 255
             if self.hit_flash_timer <= 0:
-                self.color = (255, 255, 255)
                 self.alpha = 255
 
         super().update()
@@ -672,13 +668,11 @@ class Mudman(arcade.Sprite):
     def update(self, delta_time):
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
-            # Чередование: белая вспышка / нормальный вид
-            if self.hit_flash_timer % 2 == 1:
-                self.color = (200, 200, 255)  # холодная белая вспышка
+            if self.hit_flash_timer > 2:
+                self.alpha = 60
             else:
-                self.color = (255, 255, 255)
+                self.alpha = 255
             if self.hit_flash_timer <= 0:
-                self.color = (255, 255, 255)
                 self.alpha = 255
 
         if self.is_dead:
@@ -828,13 +822,11 @@ class Satyr(arcade.Sprite):
 
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
-            # Чередование: белая вспышка / нормальный вид
-            if self.hit_flash_timer % 2 == 1:
-                self.color = (200, 200, 255)  # холодная белая вспышка
+            if self.hit_flash_timer > 2:
+                self.alpha = 60
             else:
-                self.color = (255, 255, 255)
+                self.alpha = 255
             if self.hit_flash_timer <= 0:
-                self.color = (255, 255, 255)
                 self.alpha = 255
 
         if self.invincible:
@@ -866,7 +858,7 @@ class Satyr(arcade.Sprite):
         self.center_y += self.change_y
         self.center_x += self.change_x
 
-        ground_level = 50
+        ground_level = int(SCREEN_HEIGHT * 0.055)
         if self.bottom <= ground_level:
             self.bottom = ground_level
             self.on_ground = True
@@ -1790,8 +1782,14 @@ class CupHead(arcade.Sprite):
 
 
 class GameWindow(arcade.Window):
-    def __init__(self, width, height, title):
-        super().__init__(width, height, title)
+    def __init__(self):
+        super().__init__(fullscreen=True)
+        self.set_caption(SCREEN_TITLE)
+
+        global SCREEN_WIDTH, SCREEN_HEIGHT
+        SCREEN_WIDTH = self.width
+        SCREEN_HEIGHT = self.height
+
         self.background = arcade.load_texture("assets/images/backgrounds/background.jpg")
 
     def setup(self):
@@ -1803,14 +1801,14 @@ class GameWindow(arcade.Window):
         self.dragon_fireballs = arcade.SpriteList()
 
         self.cuphead = CupHead("assets/images/cuphead/Idle/cuphead_idle_0001.png", 1, 2)
-        self.cuphead.center_x = 50
-        self.cuphead.center_y = 100
+        self.cuphead.center_x = int(SCREEN_WIDTH * 0.03)
+        self.cuphead.center_y = int(SCREEN_HEIGHT * 0.11)
         self.cuphead.change_x = 0
         self.cuphead.change_y = 0
         self.cuphead.alpha = 255
         self.pull = cycle((15, 0, -15))
 
-        self.rock_lion = RockLion(1300, 200, -1)
+        self.rock_lion = RockLion(int(SCREEN_WIDTH * 0.81), int(SCREEN_HEIGHT * 0.22), -1)
 
         self.victory = False
         self.loose = False
@@ -2000,20 +1998,39 @@ class GameWindow(arcade.Window):
             spawn_type = self.rock_lion.spawn_request
             self.rock_lion.spawn_request = None
 
+            spawn_min = int(SCREEN_WIDTH * 0.03)
+            spawn_max = int(SCREEN_WIDTH * 0.75)
+            spawn_y = int(SCREEN_HEIGHT * 0.11)
+
             if spawn_type == "satyr":
                 for _ in range(3):
-                    enemy = Satyr(random.randint(50, 1200), 100, random.choice((-1, 1)), shoot=None)
+                    enemy = Satyr(
+                        random.randint(spawn_min, spawn_max),
+                        spawn_y,
+                        random.choice((-1, 1)),
+                        shoot=None
+                    )
                     self.enemies.append(enemy)
 
             elif spawn_type == "mudman":
                 for _ in range(3):
-                    enemy = Mudman(random.randint(50, 1000), 100, random.choice((-1, 1)), shoot=None)
+                    enemy = Mudman(
+                        random.randint(spawn_min, int(SCREEN_WIDTH * 0.625)),
+                        spawn_y,
+                        random.choice((-1, 1)),
+                        shoot=None
+                    )
                     self.enemies.append(enemy)
 
             elif spawn_type == "dragon":
                 for i in range(2):
                     dragon_type = random.randint(0, 2)
-                    enemy = BabyDragon(random.randint(50, 1200), 100, random.choice((-1, 1)), dragon_type)
+                    enemy = BabyDragon(
+                        random.randint(spawn_min, spawn_max),
+                        spawn_y,
+                        random.choice((-1, 1)),
+                        dragon_type
+                    )
                     self.enemies.append(enemy)
 
         self.all_sprites.update(delta_time)
@@ -2091,7 +2108,7 @@ class GameWindow(arcade.Window):
                 self.cuphead.dashing_back = False
                 self.cuphead.change_x = 0
 
-        ground_level = 50
+        ground_level = int(SCREEN_HEIGHT * 0.055)
         if self.cuphead.bottom <= ground_level:
             self.cuphead.bottom = ground_level
             self.cuphead.on_ground = True
@@ -2192,6 +2209,10 @@ class GameWindow(arcade.Window):
                         bullet.remove_from_sprite_lists()
 
     def on_key_press(self, key, modifiers):
+        if key == arcade.key.ESCAPE:
+            self.close()
+            return
+
         if key == arcade.key.R and (self.victory or self.loose):
             self.setup()
             return
@@ -2484,7 +2505,7 @@ class GameWindow(arcade.Window):
 
 
 def main():
-    window = GameWindow(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+    window = GameWindow()
     window.setup()
     arcade.run()
 
