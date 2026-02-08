@@ -5,14 +5,14 @@ import math
 
 SCREEN_WIDTH = 1600
 SCREEN_HEIGHT = 900
-SCREEN_TITLE = "Овощебанда"
+SCREEN_TITLE = "Лев"
 SPEED = 5
 WATER_HEIGHT = SCREEN_HEIGHT // 3
 BULLET_SPEED = 40
 EX_BULLET_SPEED = 30
 DRAGON_FIRE_SPEED = 8
 
-ENEMY_HIT_FLASH_DURATION = 8
+ENEMY_HIT_FLASH_DURATION = 6
 
 _bullet_texture_cache = {}
 
@@ -147,11 +147,13 @@ class RockLion(arcade.Sprite):
     def update(self, delta_time):
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
-            if self.hit_flash_timer % 2 == 0:
-                self.alpha = 100
+            # Чередование: белая вспышка / нормальный вид
+            if self.hit_flash_timer % 2 == 1:
+                self.color = (200, 200, 255)  # холодная белая вспышка
             else:
-                self.alpha = 255
+                self.color = (255, 255, 255)
             if self.hit_flash_timer <= 0:
+                self.color = (255, 255, 255)
                 self.alpha = 255
 
         if self.is_dead:
@@ -498,11 +500,13 @@ class BabyDragon(arcade.Sprite):
 
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
-            if self.hit_flash_timer % 2 == 0:
-                self.alpha = 100
+            # Чередование: белая вспышка / нормальный вид
+            if self.hit_flash_timer % 2 == 1:
+                self.color = (200, 200, 255)  # холодная белая вспышка
             else:
-                self.alpha = 255
+                self.color = (255, 255, 255)
             if self.hit_flash_timer <= 0:
+                self.color = (255, 255, 255)
                 self.alpha = 255
 
         super().update()
@@ -668,11 +672,13 @@ class Mudman(arcade.Sprite):
     def update(self, delta_time):
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
-            if self.hit_flash_timer % 2 == 0:
-                self.alpha = 100
+            # Чередование: белая вспышка / нормальный вид
+            if self.hit_flash_timer % 2 == 1:
+                self.color = (200, 200, 255)  # холодная белая вспышка
             else:
-                self.alpha = 255
+                self.color = (255, 255, 255)
             if self.hit_flash_timer <= 0:
+                self.color = (255, 255, 255)
                 self.alpha = 255
 
         if self.is_dead:
@@ -822,11 +828,13 @@ class Satyr(arcade.Sprite):
 
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
-            if self.hit_flash_timer % 2 == 0:
-                self.alpha = 100
+            # Чередование: белая вспышка / нормальный вид
+            if self.hit_flash_timer % 2 == 1:
+                self.color = (200, 200, 255)  # холодная белая вспышка
             else:
-                self.alpha = 255
+                self.color = (255, 255, 255)
             if self.hit_flash_timer <= 0:
+                self.color = (255, 255, 255)
                 self.alpha = 255
 
         if self.invincible:
@@ -1163,7 +1171,7 @@ class CupHead(arcade.Sprite):
         for texture in self.textures_dict["parry"]["right"]:
             self.textures_dict["parry"]["left"].append(texture.flip_left_right())
 
-        self.state = "idle"
+        self.state = "flex"
         self.direction = "right"
         self.current_frame = 0
         self.animation_speed_counter = 0
@@ -1177,7 +1185,7 @@ class CupHead(arcade.Sprite):
         self.dashing = False
         self.need_dash_teleport = False
         self.dash_direction_multiplier = 1
-        self.flexing = False
+        self.flexing = True
         self.ex_straight = False
         self.can_move = True
         self.dashing_back = False
@@ -1999,7 +2007,7 @@ class GameWindow(arcade.Window):
 
             elif spawn_type == "mudman":
                 for _ in range(3):
-                    enemy = Mudman(random.randint(50, 1200), 100, random.choice((-1, 1)), shoot=None)
+                    enemy = Mudman(random.randint(50, 1000), 100, random.choice((-1, 1)), shoot=None)
                     self.enemies.append(enemy)
 
             elif spawn_type == "dragon":
