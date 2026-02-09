@@ -5,7 +5,7 @@ import math
 
 SCREEN_WIDTH = 1600
 SCREEN_HEIGHT = 900
-SCREEN_TITLE = "Лев"
+SCREEN_TITLE = "Cuphead"
 SPEED = 5
 WATER_HEIGHT = SCREEN_HEIGHT // 3
 BULLET_SPEED = 40
@@ -14,13 +14,13 @@ DRAGON_FIRE_SPEED = 8
 
 ENEMY_HIT_FLASH_DURATION = 6
 
-_bullet_texture_cache = {}
+appi = {}
 
 
 def get_bullet_texture(path):
-    if path not in _bullet_texture_cache:
-        _bullet_texture_cache[path] = arcade.load_texture(path)
-    return _bullet_texture_cache[path]
+    if path not in appi:
+        appi[path] = arcade.load_texture(path)
+    return appi[path]
 
 
 def preload_all_textures():
@@ -147,11 +147,13 @@ class RockLion(arcade.Sprite):
     def update(self, delta_time):
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
-            if self.hit_flash_timer > 2:
-                self.alpha = 60
+            # Чередование: белая вспышка / нормальный вид
+            if self.hit_flash_timer % 2 == 1:
+                self.color = (200, 200, 255)  # холодная белая вспышка
             else:
-                self.alpha = 255
+                self.color = (255, 255, 255)
             if self.hit_flash_timer <= 0:
+                self.color = (255, 255, 255)
                 self.alpha = 255
 
         if self.is_dead:
@@ -288,7 +290,7 @@ class DragonFire(arcade.Sprite):
         return textures_list
 
     def __init__(self, x, y, target_x, target_y, is_pink=False):
-        scale = 1.5
+        scale = 1
         self.textures_list = DragonFire._load_textures(is_pink)
         super().__init__(self.textures_list[0], scale=scale)
         self.center_x = x
@@ -297,7 +299,7 @@ class DragonFire(arcade.Sprite):
 
         dx = target_x - x
         dy = target_y - y
-        distance = math.sqrt(dx**2 + dy**2)
+        distance = math.sqrt(dx ** 2 + dy ** 2)
 
         if distance > 0:
             self.change_x = (dx / distance) * DRAGON_FIRE_SPEED
@@ -339,10 +341,10 @@ class DragonFire(arcade.Sprite):
             self.remove_from_sprite_lists()
 
         if (
-            self.right < 0
-            or self.left > SCREEN_WIDTH
-            or self.bottom > SCREEN_HEIGHT
-            or self.top < 0
+                self.right < 0
+                or self.left > SCREEN_WIDTH
+                or self.bottom > SCREEN_HEIGHT
+                or self.top < 0
         ):
             self.remove_from_sprite_lists()
 
@@ -386,10 +388,10 @@ class BabyDragon(arcade.Sprite):
         self.position_type = position_type
 
         if position_type == "left":
-            self.center_x = int(SCREEN_WIDTH * 0.06)
+            self.center_x = 100
             self.direction = "right"
         elif position_type == "right":
-            self.center_x = int(SCREEN_WIDTH * 0.94)
+            self.center_x = SCREEN_WIDTH - 100
             self.direction = "left"
         else:
             self.center_x = x
@@ -407,7 +409,7 @@ class BabyDragon(arcade.Sprite):
         self.invincible_timer = 0
         self.can_damage = False
         self.is_dead = False
-        self.target_y = int(SCREEN_HEIGHT * 0.67) if position_type == "down" else int(SCREEN_HEIGHT * 0.44)
+        self.target_y = 600 if position_type == "down" else 400
         self.attack_done = False
         self.disappear = False
 
@@ -463,7 +465,7 @@ class BabyDragon(arcade.Sprite):
             for angle_offset in [-15, 0, 15]:
                 dx = player.center_x - self.center_x
                 dy = player.center_y - self.center_y
-                distance = math.sqrt(dx**2 + dy**2)
+                distance = math.sqrt(dx ** 2 + dy ** 2)
                 base_angle = math.atan2(dy, dx)
 
                 angle = base_angle + math.radians(angle_offset)
@@ -498,11 +500,13 @@ class BabyDragon(arcade.Sprite):
 
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
-            if self.hit_flash_timer > 2:
-                self.alpha = 60
+            # Чередование: белая вспышка / нормальный вид
+            if self.hit_flash_timer % 2 == 1:
+                self.color = (200, 200, 255)  # холодная белая вспышка
             else:
-                self.alpha = 255
+                self.color = (255, 255, 255)
             if self.hit_flash_timer <= 0:
+                self.color = (255, 255, 255)
                 self.alpha = 255
 
         super().update()
@@ -668,11 +672,13 @@ class Mudman(arcade.Sprite):
     def update(self, delta_time):
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
-            if self.hit_flash_timer > 2:
-                self.alpha = 60
+            # Чередование: белая вспышка / нормальный вид
+            if self.hit_flash_timer % 2 == 1:
+                self.color = (200, 200, 255)  # холодная белая вспышка
             else:
-                self.alpha = 255
+                self.color = (255, 255, 255)
             if self.hit_flash_timer <= 0:
+                self.color = (255, 255, 255)
                 self.alpha = 255
 
         if self.is_dead:
@@ -706,8 +712,8 @@ class Mudman(arcade.Sprite):
 
         if self.start and not self.start_intro_complete:
             if (
-                self.current_frame
-                >= len(Mudman._texture_cache["intro"][self.direction]) - 1
+                    self.current_frame
+                    >= len(Mudman._texture_cache["intro"][self.direction]) - 1
             ):
                 self.start_intro_complete = True
                 self.start = False
@@ -822,11 +828,13 @@ class Satyr(arcade.Sprite):
 
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
-            if self.hit_flash_timer > 2:
-                self.alpha = 60
+            # Чередование: белая вспышка / нормальный вид
+            if self.hit_flash_timer % 2 == 1:
+                self.color = (200, 200, 255)  # холодная белая вспышка
             else:
-                self.alpha = 255
+                self.color = (255, 255, 255)
             if self.hit_flash_timer <= 0:
+                self.color = (255, 255, 255)
                 self.alpha = 255
 
         if self.invincible:
@@ -858,7 +866,7 @@ class Satyr(arcade.Sprite):
         self.center_y += self.change_y
         self.center_x += self.change_x
 
-        ground_level = int(SCREEN_HEIGHT * 0.055)
+        ground_level = 50
         if self.bottom <= ground_level:
             self.bottom = ground_level
             self.on_ground = True
@@ -1365,11 +1373,11 @@ class CupHead(arcade.Sprite):
         elif self.shoot_diagonal_up_running_left:
             new_state = "shoot_diagonal_up_running_left"
         elif (
-            self.shooting
-            and not self.moving
-            and not self.duck
-            and self.on_ground
-            and self.can_shoot
+                self.shooting
+                and not self.moving
+                and not self.duck
+                and self.on_ground
+                and self.can_shoot
         ):
             if self.keys_pressed["up"]:
                 new_state = "shoot_up"
@@ -1781,16 +1789,13 @@ class CupHead(arcade.Sprite):
             self.duck_shooting = False
 
 
-class GameWindow(arcade.Window):
+class GameWindow(arcade.View):
     def __init__(self):
-        super().__init__(fullscreen=True)
-        self.set_caption(SCREEN_TITLE)
-
-        global SCREEN_WIDTH, SCREEN_HEIGHT
-        SCREEN_WIDTH = self.width
-        SCREEN_HEIGHT = self.height
-
+        super().__init__()
         self.background = arcade.load_texture("assets/images/backgrounds/background.jpg")
+
+    def on_show_view(self):
+        self.setup()
 
     def setup(self):
         preload_all_textures()
@@ -1801,14 +1806,14 @@ class GameWindow(arcade.Window):
         self.dragon_fireballs = arcade.SpriteList()
 
         self.cuphead = CupHead("assets/images/cuphead/Idle/cuphead_idle_0001.png", 1, 2)
-        self.cuphead.center_x = int(SCREEN_WIDTH * 0.03)
-        self.cuphead.center_y = int(SCREEN_HEIGHT * 0.11)
+        self.cuphead.center_x = 50
+        self.cuphead.center_y = 100
         self.cuphead.change_x = 0
         self.cuphead.change_y = 0
         self.cuphead.alpha = 255
         self.pull = cycle((15, 0, -15))
 
-        self.rock_lion = RockLion(int(SCREEN_WIDTH * 0.81), int(SCREEN_HEIGHT * 0.22), -1)
+        self.rock_lion = RockLion(1300, 200, -1)
 
         self.victory = False
         self.loose = False
@@ -1998,39 +2003,20 @@ class GameWindow(arcade.Window):
             spawn_type = self.rock_lion.spawn_request
             self.rock_lion.spawn_request = None
 
-            spawn_min = int(SCREEN_WIDTH * 0.03)
-            spawn_max = int(SCREEN_WIDTH * 0.75)
-            spawn_y = int(SCREEN_HEIGHT * 0.11)
-
             if spawn_type == "satyr":
                 for _ in range(3):
-                    enemy = Satyr(
-                        random.randint(spawn_min, spawn_max),
-                        spawn_y,
-                        random.choice((-1, 1)),
-                        shoot=None
-                    )
+                    enemy = Satyr(random.randint(50, 1200), 100, random.choice((-1, 1)), shoot=None)
                     self.enemies.append(enemy)
 
             elif spawn_type == "mudman":
                 for _ in range(3):
-                    enemy = Mudman(
-                        random.randint(spawn_min, int(SCREEN_WIDTH * 0.625)),
-                        spawn_y,
-                        random.choice((-1, 1)),
-                        shoot=None
-                    )
+                    enemy = Mudman(random.randint(50, 1000), 100, random.choice((-1, 1)), shoot=None)
                     self.enemies.append(enemy)
 
             elif spawn_type == "dragon":
                 for i in range(2):
                     dragon_type = random.randint(0, 2)
-                    enemy = BabyDragon(
-                        random.randint(spawn_min, spawn_max),
-                        spawn_y,
-                        random.choice((-1, 1)),
-                        dragon_type
-                    )
+                    enemy = BabyDragon(random.randint(50, 1200), 100, random.choice((-1, 1)), dragon_type)
                     self.enemies.append(enemy)
 
         self.all_sprites.update(delta_time)
@@ -2069,15 +2055,15 @@ class GameWindow(arcade.Window):
                 fireball.remove_from_sprite_lists()
 
         if (
-            not self.cuphead.dashing
-            and self.cuphead.can_move
-            and not self.cuphead.dashing_back
-            and not self.cuphead.flexing
-            and not self.cuphead.ex_straight
-            and not self.cuphead.hit
-            and not self.cuphead.parry
-            and not self.cuphead.on_ground
-            and not self.cuphead.force_stop_movement
+                not self.cuphead.dashing
+                and self.cuphead.can_move
+                and not self.cuphead.dashing_back
+                and not self.cuphead.flexing
+                and not self.cuphead.ex_straight
+                and not self.cuphead.hit
+                and not self.cuphead.parry
+                and not self.cuphead.on_ground
+                and not self.cuphead.force_stop_movement
         ):
             self.cuphead.change_y -= 0.5
 
@@ -2108,7 +2094,7 @@ class GameWindow(arcade.Window):
                 self.cuphead.dashing_back = False
                 self.cuphead.change_x = 0
 
-        ground_level = int(SCREEN_HEIGHT * 0.055)
+        ground_level = 50
         if self.cuphead.bottom <= ground_level:
             self.cuphead.bottom = ground_level
             self.cuphead.on_ground = True
@@ -2209,10 +2195,9 @@ class GameWindow(arcade.Window):
                         bullet.remove_from_sprite_lists()
 
     def on_key_press(self, key, modifiers):
-        if key == arcade.key.ESCAPE:
-            self.close()
+        if key == arcade.key.ESCAPE and (self.loose or self.victory):
+            arcade.close_window()
             return
-
         if key == arcade.key.R and (self.victory or self.loose):
             self.setup()
             return
@@ -2224,11 +2209,11 @@ class GameWindow(arcade.Window):
             return
 
         if (
-            self.loose
-            or self.victory
-            or self.cuphead.flexing
-            or self.cuphead.ex_straight
-            or self.cuphead.hit
+                self.loose
+                or self.victory
+                or self.cuphead.flexing
+                or self.cuphead.ex_straight
+                or self.cuphead.hit
         ):
             return
 
@@ -2237,13 +2222,13 @@ class GameWindow(arcade.Window):
             self.cuphead.change_direction("left")
 
             if (
-                not self.cuphead.dashing
-                and not self.cuphead.dashing_back
-                and not self.cuphead.duck
-                and not self.cuphead.flexing
-                and not self.cuphead.ex_straight
-                and not self.cuphead.parry
-                and not self.cuphead.force_stop_movement
+                    not self.cuphead.dashing
+                    and not self.cuphead.dashing_back
+                    and not self.cuphead.duck
+                    and not self.cuphead.flexing
+                    and not self.cuphead.ex_straight
+                    and not self.cuphead.parry
+                    and not self.cuphead.force_stop_movement
             ):
                 self.cuphead.change_x = -SPEED
                 self.cuphead.moving = True
@@ -2256,13 +2241,13 @@ class GameWindow(arcade.Window):
             self.cuphead.change_direction("right")
 
             if (
-                not self.cuphead.dashing
-                and not self.cuphead.dashing_back
-                and not self.cuphead.duck
-                and not self.cuphead.flexing
-                and not self.cuphead.ex_straight
-                and not self.cuphead.parry
-                and not self.cuphead.force_stop_movement
+                    not self.cuphead.dashing
+                    and not self.cuphead.dashing_back
+                    and not self.cuphead.duck
+                    and not self.cuphead.flexing
+                    and not self.cuphead.ex_straight
+                    and not self.cuphead.parry
+                    and not self.cuphead.force_stop_movement
             ):
                 self.cuphead.change_x = SPEED
                 self.cuphead.moving = True
@@ -2273,11 +2258,11 @@ class GameWindow(arcade.Window):
         elif key == arcade.key.UP:
             self.cuphead.keys_pressed["up"] = True
             if (
-                self.cuphead.shooting
-                and not self.cuphead.moving
-                and not self.cuphead.duck
-                and self.cuphead.on_ground
-                and self.cuphead.can_shoot
+                    self.cuphead.shooting
+                    and not self.cuphead.moving
+                    and not self.cuphead.duck
+                    and self.cuphead.on_ground
+                    and self.cuphead.can_shoot
             ):
                 self.cuphead.shooting_up = True
                 self.cuphead.shooting_straight = False
@@ -2292,10 +2277,10 @@ class GameWindow(arcade.Window):
                 self.cuphead.shooting_down = False
 
         elif (
-            key == arcade.key.SPACE
-            and not self.cuphead.flexing
-            and not self.cuphead.ex_straight
-            and not self.cuphead.hit
+                key == arcade.key.SPACE
+                and not self.cuphead.flexing
+                and not self.cuphead.ex_straight
+                and not self.cuphead.hit
         ):
             if self.cuphead.on_ground:
                 self.cuphead.change_y = 10
@@ -2306,13 +2291,13 @@ class GameWindow(arcade.Window):
                 self.cuphead.process_parry(is_air_parry=True)
 
         if (
-            key == arcade.key.X
-            and not self.cuphead.dashing
-            and not self.cuphead.dashing_back
-            and not self.cuphead.flexing
-            and not self.cuphead.ex_straight
-            and not self.cuphead.parry
-            and self.cuphead.can_dash
+                key == arcade.key.X
+                and not self.cuphead.dashing
+                and not self.cuphead.dashing_back
+                and not self.cuphead.flexing
+                and not self.cuphead.ex_straight
+                and not self.cuphead.parry
+                and self.cuphead.can_dash
         ):
             if self.cuphead.count_dash:
                 self.cuphead.start_dash()
@@ -2320,11 +2305,11 @@ class GameWindow(arcade.Window):
                     self.cuphead.count_dash -= 1
 
         elif (
-            key == arcade.key.F
-            and not self.cuphead.flexing
-            and not self.cuphead.ex_straight
-            and self.cuphead.on_ground
-            and not self.cuphead.parry
+                key == arcade.key.F
+                and not self.cuphead.flexing
+                and not self.cuphead.ex_straight
+                and self.cuphead.on_ground
+                and not self.cuphead.parry
         ):
             self.cuphead.flexing = True
             self.cuphead.change_x = 0
@@ -2342,11 +2327,11 @@ class GameWindow(arcade.Window):
             self.cuphead.shooting_diagonal_up = False
 
         elif (
-            key == arcade.key.V
-            and not self.cuphead.ex_straight
-            and not self.cuphead.flexing
-            and not self.cuphead.parry
-            and self.cuphead.ex_cards >= 1
+                key == arcade.key.V
+                and not self.cuphead.ex_straight
+                and not self.cuphead.flexing
+                and not self.cuphead.parry
+                and self.cuphead.ex_cards >= 1
         ):
             self.cuphead.ex_straight = True
             self.cuphead.ex_cards -= 1
@@ -2365,10 +2350,10 @@ class GameWindow(arcade.Window):
             self.cuphead.shooting_diagonal_up = False
 
         if (
-            key == arcade.key.Z
-            and not self.cuphead.flexing
-            and not self.cuphead.ex_straight
-            and not self.cuphead.parry
+                key == arcade.key.Z
+                and not self.cuphead.flexing
+                and not self.cuphead.ex_straight
+                and not self.cuphead.parry
         ):
             if not self.cuphead.can_shoot:
                 return
@@ -2377,9 +2362,9 @@ class GameWindow(arcade.Window):
 
             self.cuphead.shooting = True
             if (
-                not self.cuphead.moving
-                and not self.cuphead.duck
-                and self.cuphead.on_ground
+                    not self.cuphead.moving
+                    and not self.cuphead.duck
+                    and self.cuphead.on_ground
             ):
                 self.cuphead.shooting_straight = True
 
@@ -2391,22 +2376,22 @@ class GameWindow(arcade.Window):
             return
 
         if (
-            self.loose
-            or self.victory
-            or self.cuphead.flexing
-            or self.cuphead.ex_straight
-            or self.cuphead.hit
+                self.loose
+                or self.victory
+                or self.cuphead.flexing
+                or self.cuphead.ex_straight
+                or self.cuphead.hit
         ):
             return
 
         if key == arcade.key.LEFT:
             self.cuphead.keys_pressed["left"] = False
             if (
-                not self.cuphead.keys_pressed["right"]
-                and not self.cuphead.dashing
-                and not self.cuphead.dashing_back
-                and not self.cuphead.parry
-                and not self.cuphead.force_stop_movement
+                    not self.cuphead.keys_pressed["right"]
+                    and not self.cuphead.dashing
+                    and not self.cuphead.dashing_back
+                    and not self.cuphead.parry
+                    and not self.cuphead.force_stop_movement
             ):
                 self.cuphead.change_x = 0
                 self.cuphead.moving = False
@@ -2414,11 +2399,11 @@ class GameWindow(arcade.Window):
         elif key == arcade.key.RIGHT:
             self.cuphead.keys_pressed["right"] = False
             if (
-                not self.cuphead.keys_pressed["left"]
-                and not self.cuphead.dashing
-                and not self.cuphead.dashing_back
-                and not self.cuphead.parry
-                and not self.cuphead.force_stop_movement
+                    not self.cuphead.keys_pressed["left"]
+                    and not self.cuphead.dashing
+                    and not self.cuphead.dashing_back
+                    and not self.cuphead.parry
+                    and not self.cuphead.force_stop_movement
             ):
                 self.cuphead.change_x = 0
                 self.cuphead.moving = False
@@ -2426,11 +2411,11 @@ class GameWindow(arcade.Window):
         elif key == arcade.key.UP:
             self.cuphead.keys_pressed["up"] = False
             if (
-                self.cuphead.shooting
-                and not self.cuphead.moving
-                and not self.cuphead.duck
-                and self.cuphead.on_ground
-                and self.cuphead.can_shoot
+                    self.cuphead.shooting
+                    and not self.cuphead.moving
+                    and not self.cuphead.duck
+                    and self.cuphead.on_ground
+                    and self.cuphead.can_shoot
             ):
                 self.cuphead.shooting_up = False
                 self.cuphead.shooting_straight = True
@@ -2441,12 +2426,12 @@ class GameWindow(arcade.Window):
             self.cuphead.duck_shooting = False
 
             if (
-                not self.cuphead.dashing
-                and not self.cuphead.dashing_back
-                and not self.cuphead.flexing
-                and not self.cuphead.ex_straight
-                and not self.cuphead.parry
-                and not self.cuphead.force_stop_movement
+                    not self.cuphead.dashing
+                    and not self.cuphead.dashing_back
+                    and not self.cuphead.flexing
+                    and not self.cuphead.ex_straight
+                    and not self.cuphead.parry
+                    and not self.cuphead.force_stop_movement
             ):
                 any_key_pressed = self.cuphead.keys_pressed["left"] or self.cuphead.keys_pressed["right"]
                 if any_key_pressed:
@@ -2463,13 +2448,13 @@ class GameWindow(arcade.Window):
                     self.cuphead.moving = False
 
         if (
-            not self.cuphead.dashing
-            and not self.cuphead.dashing_back
-            and not self.cuphead.duck
-            and not self.cuphead.flexing
-            and not self.cuphead.ex_straight
-            and not self.cuphead.parry
-            and not self.cuphead.force_stop_movement
+                not self.cuphead.dashing
+                and not self.cuphead.dashing_back
+                and not self.cuphead.duck
+                and not self.cuphead.flexing
+                and not self.cuphead.ex_straight
+                and not self.cuphead.parry
+                and not self.cuphead.force_stop_movement
         ):
             if key == arcade.key.LEFT and self.cuphead.change_x < 0:
                 if self.cuphead.keys_pressed["right"]:
@@ -2505,10 +2490,12 @@ class GameWindow(arcade.Window):
 
 
 def main():
-    window = GameWindow()
-    window.setup()
+    window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+    game_view = GameWindow()
+    window.show_view(game_view)
     arcade.run()
 
 
 if __name__ == "__main__":
     main()
+
